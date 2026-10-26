@@ -67,8 +67,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const request = useRef(0);
   const userIdRef = useRef<string | null>(null);
   const phaseRef = useRef(phase);
-  userIdRef.current = userId;
-  phaseRef.current = phase;
+  useEffect(() => {
+    userIdRef.current = userId;
+    phaseRef.current = phase;
+  }, [userId, phase]);
 
   async function loadMemberships(nextUserId: string, quiet: boolean) {
     const token = ++request.current;

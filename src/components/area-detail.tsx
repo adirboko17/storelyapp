@@ -20,10 +20,10 @@ import {
 import { useSession } from "@/lib/session";
 import { useAllowed, useStoreData } from "@/lib/store-data";
 import { useFontSet } from "@/theme/fonts";
-import { cardShadow, tokens } from "@/theme/tokens";
+import { TAB_SPACE, cardShadow, tokens } from "@/theme/tokens";
 
 function Page({ children }: { children: ReactNode }) {
-  return <ScrollView style={{ flex: 1, backgroundColor: tokens.canvas }} contentContainerStyle={{ padding: 16, gap: 12 }}>{children}</ScrollView>;
+  return <ScrollView style={{ flex: 1, backgroundColor: tokens.card }} contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: TAB_SPACE + 20 }}>{children}</ScrollView>;
 }
 
 export function AreaDetail({ area, id }: { area: AreaKey; id: string }) {

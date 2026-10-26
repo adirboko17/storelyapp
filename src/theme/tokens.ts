@@ -26,7 +26,21 @@ export const tokens = {
   draftBg: "#e0f0ff",
   draftText: "#00527c",
   emptyBg: "#fedad9",
+  night: "#000000",
+  nightRaised: "#1f1f1f",
+  nightField: "#2b2b2b",
+  nightLine: "#303030",
+  nightMuted: "#a8a8a8",
+  field: "#f1f1f1",
+  section: "#f7f7f7",
+  chart: "#3d9bff",
+  chartPrevious: "#8a8a8a",
+  menuActive: "#303030",
+  switchStore: "#1c3d8c",
 } as const;
+
+export const SHEET_RADIUS = 18;
+export const TAB_SPACE = 96;
 
 export const cardShadow = {
   backgroundColor: tokens.card,

@@ -37,8 +37,18 @@ export type TrafficSnapshot = {
     returningVisitors: number;
     locations: TrafficPlace[];
   };
-  today: { visits: number; orders: number; sales: number; locations: TrafficPlace[] };
+  today: HourlyDay & { locations: TrafficPlace[] };
+  yesterday: HourlyDay;
   days: { sales: number[]; orders: number[]; visits: number[] };
+};
+
+export type HourlyDay = {
+  visits: number;
+  orders: number;
+  sales: number;
+  visitsByHour: number[];
+  ordersByHour: number[];
+  salesByHour: number[];
 };
 
 export type CampaignRow = {
@@ -113,7 +123,16 @@ export function parseTraffic(value: unknown): TrafficSnapshot {
   const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const now = row.now && typeof row.now === "object" ? (row.now as Record<string, unknown>) : {};
   const today = row.today && typeof row.today === "object" ? (row.today as Record<string, unknown>) : {};
+  const yesterday = row.yesterday && typeof row.yesterday === "object" ? (row.yesterday as Record<string, unknown>) : {};
   const days = row.days && typeof row.days === "object" ? (row.days as Record<string, unknown>) : {};
+  const hourly = (day: Record<string, unknown>): HourlyDay => ({
+    visits: count(day.visits),
+    orders: count(day.orders),
+    sales: count(day.sales),
+    visitsByHour: series(day.visitsByHour),
+    ordersByHour: series(day.ordersByHour),
+    salesByHour: series(day.salesByHour),
+  });
   return {
     now: {
       visitors: count(now.visitors),
@@ -127,12 +146,8 @@ export function parseTraffic(value: unknown): TrafficSnapshot {
       returningVisitors: count(now.returningVisitors),
       locations: places(now.locations),
     },
-    today: {
-      visits: count(today.visits),
-      orders: count(today.orders),
-      sales: count(today.sales),
-      locations: places(today.locations),
-    },
+    today: { ...hourly(today), locations: places(today.locations) },
+    yesterday: hourly(yesterday),
     days: { sales: series(days.sales), orders: series(days.orders), visits: series(days.visits) },
   };
 }
@@ -222,13 +237,13 @@ export async function loadCampaigns(storeId: string) {
     .eq("store_id", storeId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(hebrewError(error));
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const rows = (data ?? []) as Record<string, unknown>[];
   const segmentIds = rows.map((row) => row.segment_id).filter((id): id is string => typeof id === "string");
   const audiences = new Map<string, string>();
   if (segmentIds.length) {
     const loaded = await supabase.from("marketing_segments").select("id, definition").in("id", segmentIds);
     if (loaded.error) throw new Error(hebrewError(loaded.error));
-    for (const segment of (loaded.data ?? []) as Array<Record<string, unknown>>) {
+    for (const segment of (loaded.data ?? []) as Record<string, unknown>[]) {
       const definition = segment.definition && typeof segment.definition === "object" ? (segment.definition as Record<string, unknown>) : null;
       const key = typeof definition?.key === "string" ? definition.key : "";
       if (typeof segment.id === "string") audiences.set(segment.id, AUDIENCE[key] ?? "");
@@ -255,12 +270,12 @@ export async function loadPopups(storeId: string) {
     .eq("store_id", storeId)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(hebrewError(error));
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const rows = (data ?? []) as Record<string, unknown>[];
   const counts = new Map<string, number>();
   if (rows.length) {
     const leads = await supabase.from("store_popup_leads").select("popup_id").eq("store_id", storeId);
     if (leads.error) throw new Error(hebrewError(leads.error));
-    for (const lead of (leads.data ?? []) as Array<{ popup_id?: string }>) {
+    for (const lead of (leads.data ?? []) as { popup_id?: string }[]) {
       if (!lead.popup_id) continue;
       counts.set(lead.popup_id, (counts.get(lead.popup_id) ?? 0) + 1);
     }
@@ -285,7 +300,7 @@ export async function loadEvents(storeId: string) {
     .eq("store_id", storeId)
     .order("event_date", { ascending: true });
   if (error) throw new Error(hebrewError(error));
-  return ((data ?? []) as Array<Record<string, unknown>>).flatMap((row): EventRow[] => {
+  return ((data ?? []) as Record<string, unknown>[]).flatMap((row): EventRow[] => {
     if (typeof row.id !== "string" || typeof row.title !== "string") return [];
     const body = Array.isArray(row.body) ? row.body.filter((item): item is string => typeof item === "string").join("\n\n") : "";
     return [{
@@ -387,7 +402,17 @@ export function useStoreCall<T>(load: (storeId: string) => Promise<T>) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const run = useCallback(async (mode: "replace" | "refresh") => {
+  const run = useCallback(async (mode: "replace" | "refresh" | "silent") => {
+    if (mode === "silent") {
+      if (!storeId) return;
+      try {
+        setData(await load(storeId));
+        setError("");
+      } catch {
+        // A failed background sync keeps the last good data on screen.
+      }
+      return;
+    }
     if (!storeId) {
       setData(null);
       setError("אין חנות נבחרת.");
@@ -409,10 +434,11 @@ export function useStoreCall<T>(load: (storeId: string) => Promise<T>) {
   }, [load, storeId]);
 
   const refresh = useCallback(() => run("refresh"), [run]);
+  const sync = useCallback(() => run("silent"), [run]);
 
   useEffect(() => {
-    void run("replace");
+    void Promise.resolve().then(() => run("replace"));
   }, [run]);
 
-  return { data, error, loading, refreshing, refresh, storeId };
+  return { data, error, loading, refreshing, refresh, sync, storeId };
 }

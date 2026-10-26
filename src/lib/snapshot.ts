@@ -49,6 +49,32 @@ export type ProductRecord = {
   vendor?: string;
   category?: string;
   description?: string;
+  media?: string[];
+  cost?: number;
+  handle?: string;
+  tags?: string[];
+  subcategories?: string[];
+  bundles?: ProductBundle[];
+  badge?: string;
+  badgeHidden?: boolean;
+  subtitle?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  page?: ProductPageContent;
+};
+
+export type ProductBundle = { qty: number; price: number; label: string; image?: string; tag?: string };
+
+export type PageEntry = { title: string; body?: string };
+
+export type ProductPageContent = {
+  highlights: PageEntry[];
+  panels: PageEntry[];
+  steps: PageEntry[];
+  ingredients: PageEntry[];
+  inci: PageEntry[];
+  reviews: PageEntry[];
+  faqs: PageEntry[];
 };
 
 export type CustomerRecord = {
@@ -298,11 +324,73 @@ function parseOrder(value: unknown): OrderRecord | null {
   };
 }
 
+const SUBCATEGORY_PREFIX = "\u0001sub:";
+
+function parseBundles(value: unknown): ProductBundle[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((item) => {
+    const row = record(item);
+    const qty = row ? num(row, "qty") : undefined;
+    const price = row ? num(row, "price") : undefined;
+    if (!row || qty == null || !Number.isInteger(qty) || qty < 1 || price == null) return [];
+    const image = text(row, "image");
+    return [{
+      qty,
+      price,
+      label: text(row, "label")?.trim() || `${qty} יחידות`,
+      image: image?.startsWith("https://") ? image : undefined,
+      tag: text(row, "tag")?.trim() || undefined,
+    }];
+  }).sort((a, b) => a.qty - b.qty);
+}
+
+function entries(value: unknown, title: string[], body: string[]): PageEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (typeof item === "string") return item.trim() ? [{ title: item.trim() }] : [];
+    const row = record(item);
+    if (!row) return [];
+    const head = title.map((key) => text(row, key)?.trim()).find(Boolean);
+    const rest = body.map((key) => text(row, key)?.trim()).filter(Boolean).join(" · ");
+    return head ? [{ title: head, body: rest || undefined }] : [];
+  });
+}
+
+function parsePage(value: unknown): ProductPageContent | undefined {
+  const row = record(value);
+  if (!row) return undefined;
+  return {
+    highlights: entries(row.highlights, ["title"], []),
+    panels: entries(row.panels, ["title"], ["body"]),
+    steps: entries(row.steps, ["title"], ["body"]),
+    ingredients: entries(row.ingredients, ["he", "en"], ["body"]),
+    inci: entries(row.inci, ["inci"], ["he"]),
+    reviews: entries(row.reviews, ["name"], ["title", "body"]),
+    faqs: entries(row.faqs, ["q"], ["a"]),
+  };
+}
+
 function parseProduct(value: unknown): ProductRecord | null {
   const row = record(value);
   const id = row ? text(row, "id") : undefined;
   if (!row || !id) return null;
+  const rawTags = strings(row, "tags");
+  const merch = record(row.merch);
+  const badge = merch ? record(merch.badge) : null;
+  const seo = merch ? record(merch.seo) : null;
+  const headline = merch ? record(merch.headline) : null;
   return {
+    cost: num(row, "cost"),
+    handle: text(row, "handle")?.trim() || undefined,
+    tags: rawTags?.filter((tag) => !tag.startsWith("\u0001")),
+    subcategories: rawTags?.filter((tag) => tag.startsWith(SUBCATEGORY_PREFIX)).map((tag) => tag.slice(SUBCATEGORY_PREFIX.length).trim()).filter(Boolean),
+    bundles: merch ? parseBundles(merch.bundles) : undefined,
+    badge: badge ? text(badge, "label")?.trim() || undefined : undefined,
+    badgeHidden: badge ? flag(badge, "hidden") : undefined,
+    subtitle: headline ? text(headline, "subtitle")?.trim() || undefined : undefined,
+    seoTitle: seo ? text(seo, "title")?.trim() || undefined : undefined,
+    seoDescription: seo ? text(seo, "description")?.trim() || undefined : undefined,
+    page: merch ? parsePage(merch.page) : undefined,
     id,
     title: text(row, "title"),
     status: text(row, "status"),
@@ -315,7 +403,18 @@ function parseProduct(value: unknown): ProductRecord | null {
     vendor: text(row, "vendor"),
     category: text(row, "category"),
     description: text(row, "description"),
+    media: strings(row, "media")?.filter((url) => url.startsWith("https://")),
   };
+}
+
+export function productImage(products: ProductRecord[] | undefined, productId: string | undefined) {
+  if (!productId) return undefined;
+  return products?.find((product) => product.id === productId)?.media?.[0];
+}
+
+export function itemCount(order: OrderRecord) {
+  if (!order.lines) return undefined;
+  return order.lines.reduce((sum, line) => sum + (line.quantity ?? 1), 0);
 }
 
 function parseCustomer(value: unknown): CustomerRecord | null {

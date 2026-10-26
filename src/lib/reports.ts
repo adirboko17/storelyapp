@@ -45,7 +45,7 @@ function lastDays(orders: OrderRecord[], days: number) {
   });
 }
 
-function moneyRows(entries: Array<[string, number]>) {
+function moneyRows(entries: [string, number][]) {
   return entries
     .filter(([, value]) => value !== 0)
     .sort((a, b) => b[1] - a[1])

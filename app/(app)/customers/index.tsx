@@ -1,53 +1,61 @@
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { FlatList } from "react-native";
 import { useRouter } from "expo-router";
-import { JumpRow } from "@/components/browse";
-import { ResourceList } from "@/components/resource-list";
-import { AppText } from "@/components/ui";
-import { formatCount } from "@/lib/format";
-import type { CustomerRecord } from "@/lib/snapshot";
-import { useStoreData } from "@/lib/store-data";
-import { useFontSet } from "@/theme/fonts";
-import { tokens } from "@/theme/tokens";
+import { CUSTOMER_SWITCH, CustomerRow } from "@/components/rows";
+import { Chips, NightScreen, SearchBar, SheetEmpty } from "@/components/shell";
+import { ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
+import { useAllowed, useStoreData } from "@/lib/store-data";
+import { TAB_SPACE } from "@/theme/tokens";
+
+type Tab = "all" | "repeat" | "subscribed";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "הכל" },
+  { id: "repeat", label: "לקוחות חוזרים" },
+  { id: "subscribed", label: "מנויים לדיוור" },
+];
 
 export default function CustomersScreen() {
-  const fonts = useFontSet();
   const router = useRouter();
-  const { snapshot } = useStoreData();
+  const allowed = useAllowed("customers.read");
+  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<Tab>("all");
+  const [byName, setByName] = useState(false);
   const customers = snapshot?.customers;
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const list = customers ?? [];
-    if (!needle) return list;
-    return list.filter((person) => `${person.name ?? ""} ${person.email ?? ""} ${person.phone ?? ""} ${person.city ?? ""}`.toLowerCase().includes(needle));
-  }, [customers, query]);
+    const list = (customers ?? []).filter((person) => {
+      if (tab === "repeat" && !(person.orders != null && person.orders > 1)) return false;
+      if (tab === "subscribed" && person.subscribed !== true) return false;
+      if (!needle) return true;
+      return `${person.name ?? ""} ${person.email ?? ""} ${person.phone ?? ""} ${person.city ?? ""}`.toLowerCase().includes(needle);
+    });
+    return byName ? [...list].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "he")) : list;
+  }, [customers, query, tab, byName]);
 
   return (
-    <ResourceList
-      permission="customers.read"
-      query={query}
-      onQuery={setQuery}
-      placeholder="חיפוש לקוחות"
-      data={customers ? rows : []}
-      empty={customers ? "אין לקוחות עדיין" : "הסנאפשוט לא כולל לקוחות."}
-      keyExtractor={(person) => person.id}
-      onPress={(person) => router.push(`/customers/${person.id}`)}
-      extra={<JumpRow items={[{ label: "פלחים", href: "/more/area/segments" }]} />}
-      renderItem={(person) => <CustomerRow person={person} bold={fonts.semibold} />}
-    />
-  );
-}
-
-function CustomerRow({ person, bold }: { person: CustomerRecord; bold: string }) {
-  const detail = [person.email, person.phone, person.city].filter(Boolean).join(" · ");
-  return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <AppText style={{ flex: 1, fontFamily: bold }} numberOfLines={1}>{person.name || ""}</AppText>
-        {person.orders != null ? <AppText style={{ color: tokens.inkSecondary, fontSize: 13 }}>{formatCount(person.orders)} הזמנות</AppText> : null}
-      </View>
-      {detail ? <AppText style={{ color: tokens.inkSecondary, fontSize: 13 }} numberOfLines={1}>{detail}</AppText> : null}
-    </View>
+    <NightScreen title="לקוחות" options={CUSTOMER_SWITCH.map((item) => ({ ...item, active: item.href === "/customers" }))}>
+      {loading ? <LoadingBlock /> : !allowed ? (
+        <SheetEmpty icon="user" text="אין הרשאה למסך הזה." />
+      ) : (
+        <>
+          <SearchBar value={query} onChange={setQuery} placeholder="חיפוש" onSort={() => setByName(!byName)} sortActive={byName} />
+          <Chips items={TABS} value={tab} onChange={setTab} />
+          {error ? <ErrorNote text={error} /> : null}
+          <FlatList
+            data={rows}
+            keyExtractor={(person) => person.id}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE + 12 }}
+            refreshControl={refreshControl(refreshing, () => void refresh())}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => <CustomerRow person={item} onPress={() => router.push(`/customers/${item.id}`)} />}
+            ListEmptyComponent={error ? undefined : (
+              <SheetEmpty icon="user" text={!customers ? "הסנאפשוט לא כולל לקוחות." : query.trim() ? "אין תוצאות לחיפוש" : "אין לקוחות בסינון הזה"} />
+            )}
+          />
+        </>
+      )}
+    </NightScreen>
   );
 }

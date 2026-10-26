@@ -7,7 +7,7 @@ export type OrderPatch = {
   comment?: string;
 };
 
-export const ORDER_STATUS_ACTIONS: Array<{ id: string; label: string; patch: OrderPatch }> = [
+export const ORDER_STATUS_ACTIONS: { id: string; label: string; patch: OrderPatch }[] = [
   {
     id: "progress",
     label: "סימון כבטיפול",

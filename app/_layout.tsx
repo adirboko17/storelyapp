@@ -47,7 +47,7 @@ function RootNavigator() {
   const dark = group === "(auth)" && screen === "login";
   return (
     <View style={{ flex: 1, direction: "rtl", backgroundColor: dark ? tokens.login : tokens.canvas }}>
-      <StatusBar style={dark ? "light" : "dark"} />
+      {group === "(auth)" ? <StatusBar style={dark ? "light" : "dark"} /> : null}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.canvas } }} />
     </View>
   );

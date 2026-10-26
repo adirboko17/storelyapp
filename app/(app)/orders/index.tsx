@@ -1,62 +1,93 @@
 import { useMemo, useState } from "react";
-import { View } from "react-native";
-import { useRouter } from "expo-router";
-import { JumpRow } from "@/components/browse";
-import { ResourceList } from "@/components/resource-list";
-import { AppText, Badge } from "@/components/ui";
-import { formatIls, hebrewWhen } from "@/lib/format";
-import { FULFILLMENT_BADGE, knownBadge } from "@/lib/orders";
-import { sortedOrders, type OrderRecord } from "@/lib/snapshot";
-import { useStoreData } from "@/lib/store-data";
-import { useFontSet } from "@/theme/fonts";
-import { tokens } from "@/theme/tokens";
+import { SectionList } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ORDER_SWITCH, OrderRow } from "@/components/rows";
+import { Chips, NightScreen, SearchBar, SectionLabel, SheetEmpty } from "@/components/shell";
+import { ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
+import { hebrewDay } from "@/lib/format";
+import { isOpenOrder, sortedOrders, type OrderRecord } from "@/lib/snapshot";
+import { useAllowed, useStoreData } from "@/lib/store-data";
+import { TAB_SPACE } from "@/theme/tokens";
 
-function includes(value: string | undefined, needle: string) {
-  return (value ?? "").toLowerCase().includes(needle);
+type Tab = "all" | "unfulfilled" | "unpaid" | "open" | "closed";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "הכל" },
+  { id: "unfulfilled", label: "לא נשלחו" },
+  { id: "unpaid", label: "לא שולמו" },
+  { id: "open", label: "פתוחות" },
+  { id: "closed", label: "בארכיון" },
+];
+
+function inTab(order: OrderRecord, tab: Tab) {
+  if (tab === "unfulfilled") return Boolean(order.fulfillment) && order.fulfillment !== "fulfilled";
+  if (tab === "unpaid") return order.pay === "pending";
+  if (tab === "open") return isOpenOrder(order);
+  if (tab === "closed") return Boolean(order.fulfillment) && !isOpenOrder(order);
+  return true;
 }
 
 export default function OrdersScreen() {
-  const fonts = useFontSet();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const router = useRouter();
-  const { snapshot } = useStoreData();
+  const allowed = useAllowed("orders.read");
+  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<Tab>(() => TABS.find((item) => item.id === params.tab)?.id ?? "all");
+  const [oldest, setOldest] = useState(false);
+  const [seenTab, setSeenTab] = useState(params.tab);
+  if (params.tab !== seenTab) {
+    setSeenTab(params.tab);
+    const next = TABS.find((item) => item.id === params.tab)?.id;
+    if (next) setTab(next);
+  }
+
   const orders = snapshot?.orders;
-  const rows = useMemo(() => {
+  const sections = useMemo(() => {
     const needle = query.trim().replaceAll("#", "").toLowerCase();
     const sorted = sortedOrders(orders ?? []);
-    if (!needle) return sorted;
-    return sorted.filter((order) => String(order.number).includes(needle) || includes(order.customerName, needle));
-  }, [orders, query]);
+    const list = (oldest ? sorted.reverse() : sorted).filter((order) => {
+      if (!inTab(order, tab)) return false;
+      if (!needle) return true;
+      return String(order.number).includes(needle) || (order.customerName ?? "").toLowerCase().includes(needle);
+    });
+    const groups: { title: string; data: OrderRecord[] }[] = [];
+    list.forEach((order) => {
+      const title = hebrewDay(order.createdAt);
+      const last = groups[groups.length - 1];
+      if (last && last.title === title) last.data.push(order);
+      else groups.push({ title, data: [order] });
+    });
+    return groups;
+  }, [orders, query, tab, oldest]);
 
   return (
-    <ResourceList
-      permission="orders.read"
-      query={query}
-      onQuery={setQuery}
-      placeholder="חיפוש הזמנות"
-      data={orders ? rows : []}
-      empty={orders ? "אין הזמנות עדיין" : "אין הזמנות בסנאפשוט"}
-      keyExtractor={(order) => String(order.number)}
-      onPress={(order) => router.push(`/orders/${order.number}`)}
-      extra={<JumpRow items={[{ label: "החזרות", href: "/more/area/returns" }, { label: "עגלות נטושות", href: "/more/area/abandoned" }]} />}
-      renderItem={(order) => <OrderRow order={order} bold={fonts.semibold} />}
-    />
-  );
-}
-
-function OrderRow({ order, bold }: { order: OrderRecord; bold: string }) {
-  const badge = knownBadge(FULFILLMENT_BADGE, order.fulfillment);
-  return (
-    <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <AppText style={{ fontFamily: bold, writingDirection: "ltr" }}>#{order.number}</AppText>
-        <AppText style={{ flex: 1 }} numberOfLines={1}>{order.customerName || ""}</AppText>
-        {order.total != null ? <AppText style={{ fontFamily: bold, writingDirection: "ltr" }}>{formatIls(order.total)}</AppText> : null}
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {order.createdAt ? <AppText style={{ flex: 1, fontSize: 12, color: tokens.inkSecondary }}>{hebrewWhen(order.createdAt)}</AppText> : <View style={{ flex: 1 }} />}
-        {badge ? <Badge {...badge} /> : null}
-      </View>
-    </View>
+    <NightScreen title="הזמנות" options={ORDER_SWITCH.map((item) => ({ ...item, active: item.href === "/orders" }))}>
+      {loading ? <LoadingBlock /> : !allowed ? (
+        <SheetEmpty icon="orders" text="אין הרשאה למסך הזה." />
+      ) : (
+        <>
+          <SearchBar value={query} onChange={setQuery} placeholder="חיפוש" onSort={() => setOldest(!oldest)} sortActive={oldest} />
+          <Chips items={TABS} value={tab} onChange={setTab} />
+          {error ? <ErrorNote text={error} /> : null}
+          <SectionList
+            sections={sections}
+            keyExtractor={(order) => String(order.number)}
+            stickySectionHeadersEnabled
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE + 12 }}
+            refreshControl={refreshControl(refreshing, () => void refresh())}
+            keyboardShouldPersistTaps="handled"
+            renderSectionHeader={({ section }) => <SectionLabel text={section.title} />}
+            renderItem={({ item }) => <OrderRow order={item} onPress={() => router.push(`/orders/${item.number}`)} />}
+            ListEmptyComponent={error ? undefined : (
+              <SheetEmpty
+                icon="orders"
+                text={!orders ? "הסנאפשוט לא כולל הזמנות." : query.trim() ? "אין תוצאות לחיפוש" : tab === "all" ? "אין הזמנות עדיין" : "אין הזמנות בסינון הזה"}
+              />
+            )}
+          />
+        </>
+      )}
+    </NightScreen>
   );
 }

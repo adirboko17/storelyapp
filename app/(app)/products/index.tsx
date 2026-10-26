@@ -1,62 +1,61 @@
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { FlatList } from "react-native";
 import { useRouter } from "expo-router";
-import { JumpRow } from "@/components/browse";
-import { ResourceList } from "@/components/resource-list";
-import { AppText, Badge } from "@/components/ui";
-import { formatCount, formatIls } from "@/lib/format";
-import { PRODUCT_BADGE, knownBadge } from "@/lib/orders";
-import type { ProductRecord } from "@/lib/snapshot";
-import { useStoreData } from "@/lib/store-data";
-import { useFontSet } from "@/theme/fonts";
-import { tokens } from "@/theme/tokens";
+import { PRODUCT_SWITCH, ProductRow } from "@/components/rows";
+import { Chips, NightScreen, SearchBar, SheetEmpty } from "@/components/shell";
+import { ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
+import { useAllowed, useStoreData } from "@/lib/store-data";
+import { TAB_SPACE } from "@/theme/tokens";
+
+type Tab = "all" | "active" | "draft" | "archived";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "all", label: "הכל" },
+  { id: "active", label: "פעיל" },
+  { id: "draft", label: "טיוטה" },
+  { id: "archived", label: "בארכיון" },
+];
 
 export default function ProductsScreen() {
-  const fonts = useFontSet();
   const router = useRouter();
-  const { snapshot } = useStoreData();
+  const allowed = useAllowed("products.read");
+  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<Tab>("all");
+  const [byName, setByName] = useState(false);
   const products = snapshot?.products;
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const list = products ?? [];
-    if (!needle) return list;
-    return list.filter((product) => `${product.title ?? ""} ${product.sku ?? ""}`.toLowerCase().includes(needle));
-  }, [products, query]);
+    const list = (products ?? []).filter((product) => {
+      if (tab !== "all" && product.status !== tab) return false;
+      if (!needle) return true;
+      return `${product.title ?? ""} ${product.sku ?? ""} ${product.vendor ?? ""}`.toLowerCase().includes(needle);
+    });
+    return byName ? [...list].sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "", "he")) : list;
+  }, [products, query, tab, byName]);
 
   return (
-    <ResourceList
-      permission="products.read"
-      query={query}
-      onQuery={setQuery}
-      placeholder="חיפוש מוצרים"
-      data={products ? rows : []}
-      empty={products ? "אין מוצרים עדיין" : "הסנאפשוט לא כולל מוצרים."}
-      keyExtractor={(product) => product.id}
-      onPress={(product) => router.push(`/products/${product.id}`)}
-      extra={<JumpRow items={[{ label: "קטגוריות", href: "/more/area/collections" }, { label: "מלאי", href: "/more/area/inventory" }, { label: "ביקורות", href: "/more/area/reviews" }, { label: "כרטיסי מתנה", href: "/more/area/gift-cards" }]} />}
-      renderItem={(product) => <ProductRow product={product} bold={fonts.semibold} />}
-    />
-  );
-}
-
-function ProductRow({ product, bold }: { product: ProductRecord; bold: string }) {
-  const badge = knownBadge(PRODUCT_BADGE, product.status);
-  const empty = product.stock === 0;
-  return (
-    <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <AppText style={{ flex: 1, fontFamily: bold }} numberOfLines={1}>{product.title || ""}</AppText>
-        {product.price != null ? <AppText style={{ writingDirection: "ltr" }}>{formatIls(product.price)}</AppText> : null}
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {product.stock != null ? (
-          <AppText style={{ flex: 1, color: empty ? tokens.negative : tokens.inkSecondary, fontSize: 13 }}>
-            {empty ? "אזל" : `מלאי ${formatCount(product.stock)}`}
-          </AppText>
-        ) : <View style={{ flex: 1 }} />}
-        {badge ? <Badge {...badge} /> : null}
-      </View>
-    </View>
+    <NightScreen title="מוצרים" options={PRODUCT_SWITCH.map((item) => ({ ...item, active: item.href === "/products" }))}>
+      {loading ? <LoadingBlock /> : !allowed ? (
+        <SheetEmpty icon="tag" text="אין הרשאה למסך הזה." />
+      ) : (
+        <>
+          <SearchBar value={query} onChange={setQuery} placeholder="חיפוש" onSort={() => setByName(!byName)} sortActive={byName} />
+          <Chips items={TABS} value={tab} onChange={setTab} />
+          {error ? <ErrorNote text={error} /> : null}
+          <FlatList
+            data={rows}
+            keyExtractor={(product) => product.id}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE + 12 }}
+            refreshControl={refreshControl(refreshing, () => void refresh())}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => <ProductRow product={item} onPress={() => router.push(`/products/${item.id}`)} />}
+            ListEmptyComponent={error ? undefined : (
+              <SheetEmpty icon="tag" text={!products ? "הסנאפשוט לא כולל מוצרים." : query.trim() ? "אין תוצאות לחיפוש" : tab === "all" ? "אין מוצרים עדיין" : "אין מוצרים בסינון הזה"} />
+            )}
+          />
+        </>
+      )}
+    </NightScreen>
   );
 }

@@ -1,36 +1,18 @@
 import type { ReactNode } from "react";
-import { FlatList, Pressable, ScrollView, View } from "react-native";
-import { useRouter, type Href } from "expo-router";
-import { AppText, EmptyState, ErrorNote, LoadingBlock, SearchField, refreshControl } from "@/components/ui";
-import { cardShadow, tokens } from "@/theme/tokens";
+import { FlatList, View } from "react-native";
+import { FlatRow, SearchBar, SheetEmpty } from "@/components/shell";
+import { AppText, ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
+import { TAB_SPACE, tokens } from "@/theme/tokens";
 
-export function JumpRow({ items }: { items: Array<{ label: string; href: string }> }) {
-  const router = useRouter();
-  if (!items.length) return null;
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingTop: 12 }}>
-      {items.map((item) => (
-        <Pressable
-          key={item.href}
-          onPress={() => router.push(item.href as Href)}
-          style={{ height: 32, borderRadius: 8, backgroundColor: tokens.card, borderWidth: 1, borderColor: tokens.line, paddingHorizontal: 12, justifyContent: "center" }}
-        >
-          <AppText style={{ fontSize: 13 }}>{item.label}</AppText>
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-}
-
-export function FactList({ rows }: { rows: Array<{ label: string; value?: string | null }> }) {
+export function FactList({ rows }: { rows: { label: string; value?: string | null }[] }) {
   const visible = rows.filter((row) => row.value);
   if (!visible.length) return null;
   return (
-    <View style={[cardShadow, { padding: 16, gap: 12 }]}>
+    <View style={{ borderRadius: 14, borderWidth: 1, borderColor: tokens.line, padding: 14, gap: 12, backgroundColor: tokens.card }}>
       {visible.map((row) => (
         <View key={row.label} style={{ gap: 2 }}>
           <AppText style={{ color: tokens.inkSecondary, fontSize: 12 }}>{row.label}</AppText>
-          <AppText>{row.value}</AppText>
+          <AppText style={{ color: tokens.inkStrong }}>{row.value}</AppText>
         </View>
       ))}
     </View>
@@ -68,26 +50,18 @@ export function BrowseList<T>({
 }) {
   if (loading) return <LoadingBlock />;
   return (
-    <View style={{ flex: 1, backgroundColor: tokens.canvas }}>
+    <View style={{ flex: 1, backgroundColor: tokens.card }}>
+      {onQuery ? <SearchBar value={query ?? ""} onChange={onQuery} placeholder={placeholder ?? "חיפוש"} /> : null}
       {error ? <ErrorNote text={error} /> : null}
-      {onQuery ? <SearchField value={query ?? ""} onChange={onQuery} placeholder={placeholder ?? "חיפוש"} /> : null}
       <FlatList
         data={data}
         keyExtractor={keyExtractor}
-        contentContainerStyle={{ flexGrow: 1, paddingTop: 12, paddingBottom: 24 }}
+        contentContainerStyle={{ flexGrow: 1, paddingTop: 8, paddingBottom: TAB_SPACE + 12 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? refreshControl(Boolean(refreshing), onRefresh) : undefined}
-        ListHeaderComponent={header ? <View style={{ marginBottom: 8 }}>{header}</View> : undefined}
-        ListEmptyComponent={error ? undefined : <EmptyState text={query?.trim() ? "אין תוצאות לחיפוש" : empty} />}
-        renderItem={({ item }) => {
-          const body = (
-            <View style={[cardShadow, { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 12 }]}>
-              {renderItem(item)}
-            </View>
-          );
-          if (!onPress) return body;
-          return <Pressable onPress={() => onPress(item)}>{body}</Pressable>;
-        }}
+        ListHeaderComponent={header ? <View style={{ paddingVertical: 8 }}>{header}</View> : undefined}
+        ListEmptyComponent={error ? undefined : <SheetEmpty text={query?.trim() ? "אין תוצאות לחיפוש" : empty} />}
+        renderItem={({ item }) => <FlatRow onPress={onPress ? () => onPress(item) : undefined}>{renderItem(item)}</FlatRow>}
       />
     </View>
   );

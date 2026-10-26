@@ -1,8 +1,7 @@
 import { Redirect, Tabs } from "expo-router";
-import { Icon, type IconName } from "@/components/icon";
+import { FloatingTabBar } from "@/components/tab-bar";
 import { useAllowed, StoreDataProvider } from "@/lib/store-data";
 import { useSession } from "@/lib/session";
-import { useFontSet } from "@/theme/fonts";
 import { tokens } from "@/theme/tokens";
 
 export default function AppLayout() {
@@ -21,29 +20,26 @@ export default function AppLayout() {
 }
 
 function AppTabs() {
-  const fonts = useFontSet();
   const orders = useAllowed("orders.read");
   const products = useAllowed("products.read");
   const customers = useAllowed("customers.read");
+  const allowed = (name: string) => {
+    if (name === "orders") return orders;
+    if (name === "products") return products;
+    if (name === "customers") return customers;
+    return true;
+  };
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: tokens.card, borderTopColor: tokens.line, borderTopWidth: 1 },
-        tabBarActiveTintColor: tokens.inkStrong,
-        tabBarInactiveTintColor: tokens.inkSecondary,
-        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
-      }}
+      tabBar={(props) => <FloatingTabBar {...props} allowed={allowed} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: tokens.night } }}
     >
-      <Tabs.Screen name="index" options={{ title: "בית", tabBarIcon: icon("home") }} />
-      <Tabs.Screen name="orders" options={{ title: "הזמנות", href: orders ? undefined : null, tabBarIcon: icon("orders") }} />
-      <Tabs.Screen name="products" options={{ title: "מוצרים", href: products ? undefined : null, tabBarIcon: icon("tag") }} />
-      <Tabs.Screen name="customers" options={{ title: "לקוחות", href: customers ? undefined : null, tabBarIcon: icon("user") }} />
-      <Tabs.Screen name="more" options={{ title: "עוד", tabBarIcon: icon("menu") }} />
+      <Tabs.Screen name="index" options={{ title: "בית" }} />
+      <Tabs.Screen name="orders" options={{ title: "הזמנות", href: orders ? undefined : null }} />
+      <Tabs.Screen name="products" options={{ title: "מוצרים", href: products ? undefined : null }} />
+      <Tabs.Screen name="customers" options={{ title: "לקוחות", href: customers ? undefined : null }} />
+      <Tabs.Screen name="more" options={{ title: "תפריט" }} />
+      <Tabs.Screen name="search" options={{ title: "חיפוש", href: null }} />
     </Tabs>
   );
-}
-
-function icon(name: IconName) {
-  return ({ color }: { color: unknown }) => <Icon name={name} color={typeof color === "string" ? color : tokens.ink} size={20} />;
 }

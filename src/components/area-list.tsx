@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { BrowseList } from "@/components/browse";
+import { LiveView } from "@/components/live-view";
 import { AppText } from "@/components/ui";
 import { formatCount, formatIls, hebrewWhen } from "@/lib/format";
 import { INTEGRATIONS, SEGMENTS, type AreaKey } from "@/lib/menu";
@@ -65,7 +66,8 @@ export function AreaList({ area }: { area: AreaKey }) {
   if (area === "popups") return <Popups />;
   if (area === "posts") return <Posts />;
   if (area === "events") return <Events />;
-  if (area === "analytics" || area === "live") return <Traffic area={area} />;
+  if (area === "live") return <LiveView />;
+  if (area === "analytics") return <Traffic />;
   if (area === "reports") return <Reports />;
   if (area === "store") return <StoreLink />;
   if (area === "general") return <General />;
@@ -455,13 +457,8 @@ function eventStatus(status: string) {
   return status;
 }
 
-function Traffic({ area }: { area: "analytics" | "live" }) {
+function Traffic() {
   const remote = useStoreCall(loadTraffic);
-  useEffect(() => {
-    if (area !== "live") return undefined;
-    const timer = setInterval(() => void remote.refresh(), 30000);
-    return () => clearInterval(timer);
-  }, [area, remote.refresh]);
   const traffic = remote.data;
   const rows = traffic ? [
     { id: "visitors", title: "מבקרים כעת", meta: formatCount(traffic.now.visitors) },

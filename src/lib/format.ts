@@ -28,6 +28,39 @@ export function hebrewWhen(value: string | undefined) {
   return `${label} ב-${time}`;
 }
 
+export function hebrewTime(value: string | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" }).format(date);
+}
+
+export function hebrewDay(value: string | undefined) {
+  if (!value) return "ללא תאריך";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "ללא תאריך";
+  const day = jerusalemDay(date);
+  if (day === jerusalemDay(new Date())) return "היום";
+  if (day === jerusalemDay(new Date(Date.now() - 86400000))) return "אתמול";
+  return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(date);
+}
+
+export function compactIls(value: number) {
+  if (Math.abs(value) >= 1000) {
+    const short = value / 1000;
+    return `₪${Number.isInteger(short) ? short : short.toFixed(1)}K`;
+  }
+  return `₪${Math.round(value)}`;
+}
+
+export function compactCount(value: number) {
+  if (Math.abs(value) >= 1000) {
+    const short = value / 1000;
+    return `${Number.isInteger(short) ? short : short.toFixed(1)}K`;
+  }
+  return String(Math.round(value));
+}
+
 export function hebrewDate(value: string | undefined) {
   if (!value) return "";
   const date = new Date(value);

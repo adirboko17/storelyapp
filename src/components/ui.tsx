@@ -95,9 +95,8 @@ export function LoadingBlock({ label = "טוען…" }: { label?: string }) {
 export function Badge({ label, background, color }: { label: string; background: string; color: string }) {
   const fonts = useFontSet();
   return (
-    <View style={{ height: 22, borderRadius: 8, backgroundColor: background, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }}>
-      <View style={{ width: 6, height: 6, borderRadius: 3, borderWidth: 1.5, borderColor: color }} />
-      <AppText style={{ color, fontFamily: fonts.medium, fontSize: 13 }}>{label}</AppText>
+    <View style={{ height: 20, borderRadius: 6, backgroundColor: background, alignItems: "center", justifyContent: "center", paddingHorizontal: 7, alignSelf: "flex-start" }}>
+      <AppText style={{ color, fontFamily: fonts.medium, fontSize: 12 }}>{label}</AppText>
     </View>
   );
 }

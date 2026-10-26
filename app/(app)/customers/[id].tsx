@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { AppText, Badge, Card } from "@/components/ui";
-import { allows } from "@/lib/access";
-import { formatCount, formatIls, hebrewDate, hebrewWhen } from "@/lib/format";
-import { FULFILLMENT_BADGE, knownBadge } from "@/lib/orders";
+import { DetailScreen, InfoRow, Section } from "@/components/detail";
+import { OrderRow } from "@/components/rows";
+import { SheetEmpty, initials } from "@/components/shell";
+import { AppText } from "@/components/ui";
+import { formatCount, formatIls, hebrewDate } from "@/lib/format";
 import { sortedOrders } from "@/lib/snapshot";
 import { useAllowed, useStoreData } from "@/lib/store-data";
 import { useFontSet } from "@/theme/fonts";
@@ -15,67 +16,62 @@ export default function CustomerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const allowed = useAllowed("customers.read");
   const canOrders = useAllowed("orders.read");
-  const { snapshot, access, error } = useStoreData();
+  const { snapshot, error } = useStoreData();
   const person = snapshot?.customers?.find((item) => item.id === id);
-  if (!allowed) return <Message text="אין הרשאה למסך הזה." />;
-  if (!person) return <Message text={error || "הלקוח לא נמצא."} />;
+  if (!allowed) return <DetailScreen title="לקוח"><SheetEmpty icon="user" text="אין הרשאה למסך הזה." /></DetailScreen>;
+  if (!person) return <DetailScreen title="לקוח"><SheetEmpty icon="user" text={error || "הלקוח לא נמצא."} /></DetailScreen>;
   const address = [person.street, person.city, person.zip].filter(Boolean).join(", ");
-  const orders = canOrders && allows(access, "orders.read") && snapshot?.orders
-    ? sortedOrders(snapshot.orders).filter((order) => order.customerId === person.id)
-    : undefined;
+  const orders = canOrders && snapshot?.orders ? sortedOrders(snapshot.orders).filter((order) => order.customerId === person.id) : undefined;
+  const spent = orders?.reduce((sum, order) => sum + (order.total ?? 0), 0);
+  const name = person.name || person.email || "לקוח";
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 32 }}>
-      <AppText style={{ fontFamily: fonts.bold, fontSize: 24, color: tokens.inkStrong }}>{person.name || ""}</AppText>
-      <Card>
-        <View style={{ padding: 16, gap: 8 }}>
-          {person.email ? <Line label="אימייל" value={person.email} /> : null}
-          {person.phone ? <Line label="טלפון" value={person.phone} /> : null}
-          {address ? <Line label="כתובת" value={address} /> : null}
-          {person.orders != null ? <Line label="הזמנות" value={formatCount(person.orders)} /> : null}
-          {person.createdAt ? <Line label="נוצר" value={hebrewDate(person.createdAt)} /> : null}
-          {person.note ? <Line label="הערה" value={person.note} /> : null}
-          {person.tags && person.tags.length > 0 ? <Line label="תגיות" value={person.tags.join(", ")} /> : null}
+    <DetailScreen title={name}>
+      <View style={{ alignItems: "center", gap: 8, paddingTop: 8, paddingBottom: 4 }}>
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#e3e3e3", alignItems: "center", justifyContent: "center" }}>
+          <AppText style={{ fontFamily: fonts.bold, fontSize: 22, color: tokens.inkStrong }}>{initials(name)}</AppText>
         </View>
-      </Card>
+        <AppText style={{ fontFamily: fonts.bold, fontSize: 20, color: tokens.inkStrong }}>{name}</AppText>
+        {person.city ? <AppText style={{ color: tokens.inkSecondary }}>{person.city}</AppText> : null}
+      </View>
       {orders ? (
-        <Card>
-          <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
-            <AppText style={{ fontFamily: fonts.bold, fontSize: 15 }}>הזמנות</AppText>
-          </View>
-          {orders.length === 0 ? <AppText style={{ padding: 16, color: tokens.inkSecondary }}>אין הזמנות עדיין</AppText> : null}
-          {orders.map((order) => {
-            const badge = knownBadge(FULFILLMENT_BADGE, order.fulfillment);
-            return (
-              <Pressable key={order.number} onPress={() => router.push(`/orders/${order.number}`)} style={{ borderTopWidth: 1, borderTopColor: tokens.line, paddingHorizontal: 16, paddingVertical: 12, gap: 6 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <AppText style={{ fontFamily: fonts.semibold, writingDirection: "ltr" }}>#{order.number}</AppText>
-                  <AppText style={{ flex: 1, color: tokens.inkSecondary, fontSize: 13 }}>{order.createdAt ? hebrewWhen(order.createdAt) : ""}</AppText>
-                  {order.total != null ? <AppText>{formatIls(order.total)}</AppText> : null}
-                </View>
-                {badge ? <Badge {...badge} /> : null}
-              </Pressable>
-            );
-          })}
-        </Card>
+        <View style={{ flexDirection: "row", marginHorizontal: 12, marginTop: 12, borderRadius: 14, borderWidth: 1, borderColor: tokens.line }}>
+          <Stat label="הזמנות" value={formatCount(orders.length)} />
+          <View style={{ width: 1, backgroundColor: tokens.line }} />
+          <Stat label="סך הכל הוצא" value={formatIls(spent ?? 0)} />
+        </View>
       ) : null}
-    </ScrollView>
+      <Section title="פרטי קשר">
+        <InfoRow label="אימייל" value={person.email} ltr />
+        <InfoRow label="טלפון" value={person.phone} ltr />
+        <InfoRow label="כתובת" value={address} />
+        <InfoRow label="לקוח מאז" value={hebrewDate(person.createdAt)} />
+        <InfoRow label="דיוור" value={person.subscribed == null ? undefined : person.subscribed ? "מנוי" : "לא מנוי"} />
+      </Section>
+      {person.note || person.tags?.length ? (
+        <Section title="הערות ותגיות">
+          {person.note ? <AppText style={{ color: tokens.ink }}>{person.note}</AppText> : null}
+          {person.tags?.length ? <AppText style={{ color: tokens.inkSecondary }}>{person.tags.join(" · ")}</AppText> : null}
+        </Section>
+      ) : null}
+      {orders && orders.length ? (
+        <View style={{ marginTop: 16 }}>
+          <AppText style={{ paddingHorizontal: 16, paddingBottom: 6, fontFamily: fonts.bold, fontSize: 15, color: tokens.inkStrong }}>הזמנות</AppText>
+          <View style={{ borderTopWidth: 1, borderTopColor: tokens.line }}>
+            {orders.map((order) => <OrderRow key={order.number} order={order} onPress={() => router.push(`/orders/${order.number}`)} />)}
+          </View>
+        </View>
+      ) : null}
+    </DetailScreen>
   );
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
+  const fonts = useFontSet();
   return (
-    <View style={{ flexDirection: "row", gap: 12 }}>
-      <AppText style={{ width: 72, color: tokens.inkSecondary }}>{label}</AppText>
-      <AppText style={{ flex: 1, color: tokens.inkStrong }}>{value}</AppText>
-    </View>
-  );
-}
-
-function Message({ text }: { text: string }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: tokens.canvas, padding: 16 }}>
-      <AppText style={{ color: tokens.inkSecondary }}>{text}</AppText>
+    <View style={{ flex: 1, padding: 14, gap: 2 }}>
+      <AppText style={{ color: tokens.inkSecondary, fontSize: 13 }}>{label}</AppText>
+      <AppText style={{ fontFamily: fonts.bold, fontSize: 17, color: tokens.inkStrong, writingDirection: "ltr", textAlign: "right" }}>{value}</AppText>
     </View>
   );
 }

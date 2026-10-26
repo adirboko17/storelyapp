@@ -27,6 +27,12 @@
       "expo-secure-store",
       "expo-font",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Storely מציגה את המיקום שלך על הגלובוס בצפייה החיה."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#fafafa",
