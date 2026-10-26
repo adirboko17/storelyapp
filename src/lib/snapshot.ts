@@ -90,6 +90,10 @@ export type CustomerRecord = {
   tags?: string[];
   createdAt?: string;
   subscribed?: boolean;
+  credit?: number;
+  language?: string;
+  sms?: boolean;
+  whatsapp?: boolean;
 };
 
 export type CollectionRecord = {
@@ -99,6 +103,9 @@ export type CollectionRecord = {
   productIds?: string[];
   hidden?: boolean;
   image?: string;
+  conditions?: unknown[];
+  excludeOutOfStock?: boolean;
+  subcategories: string[];
 };
 
 export type CheckoutRecord = {
@@ -434,6 +441,10 @@ function parseCustomer(value: unknown): CustomerRecord | null {
     tags: strings(row, "tags"),
     createdAt: text(row, "createdAt"),
     subscribed: flag(row, "subscribed"),
+    credit: num(row, "credit"),
+    language: text(row, "language"),
+    sms: flag(row, "sms"),
+    whatsapp: flag(row, "whatsapp"),
   };
 }
 
@@ -457,11 +468,31 @@ function parseDiscount(value: unknown): DiscountRecord | null {
   };
 }
 
+function subcategoryNames(rules: unknown[]) {
+  const names: string[] = [];
+  rules.forEach((rule) => {
+    const item = record(rule);
+    if (!item || item.field !== "subcategory" || typeof item.value !== "string") return;
+    const name = item.value.trim();
+    if (!name || names.some((existing) => existing.localeCompare(name, "he", { sensitivity: "accent" }) === 0)) return;
+    names.push(name);
+  });
+  return names;
+}
+
 function parseCollection(value: unknown): CollectionRecord | null {
   const row = record(value);
   const title = row ? text(row, "title") : undefined;
   if (!row || !title) return null;
   const id = text(row, "id") || title;
+  const conditions = owns(row, "conditions") && Array.isArray(row.conditions) ? row.conditions : undefined;
+  const listed = strings(row, "subcategories") ?? [];
+  const subcategories = [...(conditions ? subcategoryNames(conditions) : [])];
+  listed.forEach((name) => {
+    const clean = name.trim();
+    if (!clean || subcategories.some((existing) => existing.localeCompare(clean, "he", { sensitivity: "accent" }) === 0)) return;
+    subcategories.push(clean);
+  });
   return {
     id,
     title,
@@ -469,6 +500,9 @@ function parseCollection(value: unknown): CollectionRecord | null {
     productIds: strings(row, "productIds"),
     hidden: flag(row, "hidden"),
     image: text(row, "image"),
+    conditions,
+    excludeOutOfStock: flag(row, "excludeOutOfStock"),
+    subcategories,
   };
 }
 

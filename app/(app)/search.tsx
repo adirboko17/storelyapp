@@ -1,17 +1,14 @@
 import { useMemo, useState } from "react";
-import { Pressable, SectionList, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Keyboard, Pressable, SectionList, View } from "react-native";
+import { useRouter, type Href } from "expo-router";
 import { Icon } from "@/components/icon";
 import { CustomerRow, OrderRow, ProductRow } from "@/components/rows";
 import { SectionLabel, SheetEmpty, useStatusBar } from "@/components/shell";
+import { searchReturnPath, useSearchDraft, useTabHeader } from "@/components/tab-header";
 import { AppText } from "@/components/ui";
 import { sortedOrders, type CustomerRecord, type OrderRecord, type ProductRecord } from "@/lib/snapshot";
 import { useAllowed, useStoreData } from "@/lib/store-data";
-import { useFontSet } from "@/theme/fonts";
-import { SHEET_RADIUS, tokens } from "@/theme/tokens";
-
-type Scope = "all" | "orders" | "products" | "customers";
+import { SHEET_RADIUS, TAB_SPACE, tokens } from "@/theme/tokens";
 
 type Hit =
   | { kind: "order"; key: string; order: OrderRecord }
@@ -31,15 +28,12 @@ function remember(term: string) {
 
 export default function SearchScreen() {
   useStatusBar("light");
-  const fonts = useFontSet();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { snapshot } = useStoreData();
   const canOrders = useAllowed("orders.read");
   const canProducts = useAllowed("products.read");
   const canCustomers = useAllowed("customers.read");
-  const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<Scope>("all");
+  const { query, setQuery, scope } = useSearchDraft();
   const [, bump] = useState(0);
 
   const scopes = [
@@ -77,6 +71,20 @@ export default function SearchScreen() {
     return result;
   }, [query, scope, snapshot, canOrders, canProducts, canCustomers]);
 
+  useTabHeader(
+    { kind: "search", owner: "search", scopes: scopes.map(({ id, label }) => ({ id, label })) },
+    {
+      onClose: () => {
+        Keyboard.dismiss();
+        router.navigate(searchReturnPath() as Href);
+      },
+      onSubmit: (value) => {
+        remember(value);
+        bump((count) => count + 1);
+      },
+    },
+  );
+
   const open = (href: string) => {
     remember(query);
     bump((value) => value + 1);
@@ -85,46 +93,13 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.night }}>
-      <View style={{ paddingTop: insets.top + 6, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.navigate("/"))} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: tokens.nightRaised, alignItems: "center", justifyContent: "center" }}>
-          <Icon name="close" size={17} color="#ffffff" strokeWidth={2} />
-        </Pressable>
-        <View style={{ flex: 1, height: 40, borderRadius: 12, backgroundColor: tokens.nightField, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10 }}>
-          <Icon name="search" size={16} color={tokens.nightMuted} strokeWidth={1.8} />
-          <TextInput
-            autoFocus
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => { remember(query); bump((value) => value + 1); }}
-            placeholder="חיפוש"
-            placeholderTextColor={tokens.nightMuted}
-            returnKeyType="search"
-            selectionColor={tokens.chart}
-            style={{ flex: 1, height: 40, color: "#ffffff", fontFamily: fonts.regular, fontSize: 16, textAlign: "right", writingDirection: "rtl" }}
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <Icon name="close" size={14} color={tokens.nightMuted} strokeWidth={2} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      <View style={{ flexDirection: "row", gap: 4, paddingHorizontal: 12, paddingVertical: 12 }}>
-        {scopes.map((item) => {
-          const on = item.id === scope;
-          return (
-            <Pressable key={item.id} onPress={() => setScope(item.id)} style={{ height: 30, borderRadius: 8, paddingHorizontal: 12, justifyContent: "center", backgroundColor: on ? tokens.nightField : "transparent" }}>
-              <AppText style={{ color: "#ffffff", fontFamily: on ? fonts.semibold : fonts.medium }}>{item.label}</AppText>
-            </Pressable>
-          );
-        })}
-      </View>
       <View style={{ flex: 1, backgroundColor: tokens.card, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, overflow: "hidden" }}>
         <SectionList
+          style={{ flex: 1 }}
           sections={sections}
           keyExtractor={(item) => item.key}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE }}
           renderSectionHeader={({ section }) => <SectionLabel text={section.title} />}
           renderItem={({ item }) => {
             if (item.kind === "order") return <OrderRow order={item.order} onPress={() => open(`/orders/${item.order.number}`)} />;

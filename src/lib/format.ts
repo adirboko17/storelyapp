@@ -10,29 +10,47 @@ export function formatCount(value: number) {
   return whole.format(value);
 }
 
+const jerusalemDayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" });
+const hebrewTimeFormat = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+const hebrewDayFormat = new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jerusalem" });
+const hebrewShortDayFormat = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", timeZone: "Asia/Jerusalem" });
+const hebrewDateFormat = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+
 function jerusalemDay(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(date);
+  return jerusalemDayFormat.format(date);
+}
+
+let relativeStamp = 0;
+let relativeToday = "";
+let relativeYesterday = "";
+
+function relativeDays() {
+  const now = Date.now();
+  if (now - relativeStamp > 60_000) {
+    relativeStamp = now;
+    relativeToday = jerusalemDay(new Date(now));
+    relativeYesterday = jerusalemDay(new Date(now - 86400000));
+  }
+  return { today: relativeToday, yesterday: relativeYesterday };
 }
 
 export function hebrewWhen(value: string | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  const time = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" }).format(date);
+  const time = hebrewTimeFormat.format(date);
   const day = jerusalemDay(date);
-  const today = jerusalemDay(new Date());
-  const yesterday = jerusalemDay(new Date(Date.now() - 86400000));
+  const { today, yesterday } = relativeDays();
   if (day === today) return `היום ב-${time}`;
   if (day === yesterday) return `אתמול ב-${time}`;
-  const label = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", timeZone: "Asia/Jerusalem" }).format(date);
-  return `${label} ב-${time}`;
+  return `${hebrewShortDayFormat.format(date)} ב-${time}`;
 }
 
 export function hebrewTime(value: string | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" }).format(date);
+  return hebrewTimeFormat.format(date);
 }
 
 export function hebrewDay(value: string | undefined) {
@@ -40,9 +58,10 @@ export function hebrewDay(value: string | undefined) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "ללא תאריך";
   const day = jerusalemDay(date);
-  if (day === jerusalemDay(new Date())) return "היום";
-  if (day === jerusalemDay(new Date(Date.now() - 86400000))) return "אתמול";
-  return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(date);
+  const { today, yesterday } = relativeDays();
+  if (day === today) return "היום";
+  if (day === yesterday) return "אתמול";
+  return hebrewDayFormat.format(date);
 }
 
 export function compactIls(value: number) {
@@ -65,12 +84,5 @@ export function hebrewDate(value: string | undefined) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("he-IL", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jerusalem",
-  }).format(date);
+  return hebrewDateFormat.format(date);
 }

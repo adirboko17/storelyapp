@@ -83,6 +83,7 @@ function CollectionDetail({ id }: { id: string }) {
         { label: "שם", value: item.title },
         { label: "תיאור", value: item.description },
         { label: "תצוגה", value: item.hidden ? "מוסתרת" : "גלויה" },
+        { label: "תת קטגוריות", value: item.subcategories.length ? item.subcategories.join(" · ") : undefined },
       ]} />
       {products.map((product) => (
         <View key={product.id} style={[cardShadow, { padding: 14 }]}>

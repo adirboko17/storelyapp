@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { AreaDetail } from "@/components/area-detail";
+import { CategoryEditor } from "@/components/category-editor";
 import { DetailScreen } from "@/components/detail";
 import { SheetEmpty } from "@/components/shell";
 import { LoadingBlock } from "@/components/ui";
@@ -17,6 +18,11 @@ export default function AreaDetailScreen() {
   const title = key === "reports" ? reportById(id)?.name ?? area?.label ?? "פרטים" : key === "users" && id === "new" ? "הוספת משתמש" : area?.label ?? "פרטים";
   if (!area) return <DetailScreen title="פרטים"><SheetEmpty text="המסך לא נמצא." /></DetailScreen>;
   const allowed = area.settings ? Boolean(access?.settings) : area.permission ? allows(access, area.permission) : true;
+  if (area.key === "collections" && id === "new") {
+    if (loading) return <LoadingBlock />;
+    if (!allowed) return <DetailScreen title="הוספת קטגוריה"><SheetEmpty text="אין הרשאה למסך הזה." /></DetailScreen>;
+    return <CategoryEditor />;
+  }
   return (
     <DetailScreen title={title} scroll={false}>
       {loading ? <LoadingBlock /> : allowed ? <AreaDetail area={area.key as AreaKey} id={id} /> : <SheetEmpty text="אין הרשאה למסך הזה." />}

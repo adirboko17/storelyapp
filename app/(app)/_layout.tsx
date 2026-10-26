@@ -1,5 +1,8 @@
+import { View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { AnimatedTabsContainer, MenuOverlay, MenuProvider } from "@/components/menu-motion";
 import { FloatingTabBar } from "@/components/tab-bar";
+import { HeaderProvider, SharedTabsHeader } from "@/components/tab-header";
 import { useAllowed, StoreDataProvider } from "@/lib/store-data";
 import { useSession } from "@/lib/session";
 import { tokens } from "@/theme/tokens";
@@ -30,16 +33,29 @@ function AppTabs() {
     return true;
   };
   return (
-    <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} allowed={allowed} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: tokens.night } }}
-    >
-      <Tabs.Screen name="index" options={{ title: "בית" }} />
-      <Tabs.Screen name="orders" options={{ title: "הזמנות", href: orders ? undefined : null }} />
-      <Tabs.Screen name="products" options={{ title: "מוצרים", href: products ? undefined : null }} />
-      <Tabs.Screen name="customers" options={{ title: "לקוחות", href: customers ? undefined : null }} />
-      <Tabs.Screen name="more" options={{ title: "תפריט" }} />
-      <Tabs.Screen name="search" options={{ title: "חיפוש", href: null }} />
-    </Tabs>
+    <MenuProvider>
+      <HeaderProvider>
+        <View style={{ flex: 1, backgroundColor: tokens.night }}>
+          <AnimatedTabsContainer>
+            <SharedTabsHeader />
+          </AnimatedTabsContainer>
+          <View style={{ flex: 1 }}>
+            <Tabs
+              detachInactiveScreens={false}
+              tabBar={(props) => <FloatingTabBar {...props} allowed={allowed} />}
+              screenOptions={{ headerShown: false, animation: "none", sceneStyle: { backgroundColor: tokens.night } }}
+            >
+              <Tabs.Screen name="index" options={{ title: "בית" }} />
+              <Tabs.Screen name="orders" options={{ title: "הזמנות", lazy: false, href: orders ? undefined : null }} />
+              <Tabs.Screen name="products" options={{ title: "מוצרים", lazy: false, href: products ? undefined : null }} />
+              <Tabs.Screen name="customers" options={{ title: "לקוחות", lazy: false, href: customers ? undefined : null }} />
+              <Tabs.Screen name="more" options={{ title: "תפריט" }} />
+              <Tabs.Screen name="search" options={{ title: "חיפוש" }} />
+            </Tabs>
+          </View>
+          <MenuOverlay />
+        </View>
+      </HeaderProvider>
+    </MenuProvider>
   );
 }

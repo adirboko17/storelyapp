@@ -1,5 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { AreaList } from "@/components/area-list";
+import { CategoriesScreen } from "@/components/categories";
 import { NightScreen, SheetEmpty } from "@/components/shell";
 import { LoadingBlock } from "@/components/ui";
 import { allows } from "@/lib/access";
@@ -16,6 +17,7 @@ export default function AreaScreen() {
     .map((item) => ({ label: item.label, href: `/more/area/${item.key}`, active: item.key === area?.key }));
   if (!area) return <NightScreen title="מודול"><SheetEmpty text="המסך לא נמצא." /></NightScreen>;
   const allowed = area.settings ? Boolean(access?.settings) : area.permission ? allows(access, area.permission) : true;
+  if (area.key === "collections") return <CategoriesScreen title={area.label} options={options ?? []} allowed={allowed} loading={loading} />;
   return (
     <NightScreen title={area.label} options={options}>
       {loading ? <LoadingBlock /> : allowed ? <AreaList area={area.key as AreaKey} /> : <SheetEmpty text="אין הרשאה למסך הזה." />}

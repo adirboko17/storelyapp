@@ -62,7 +62,7 @@ export default function OrdersScreen() {
   }, [orders, query, tab, oldest]);
 
   return (
-    <NightScreen title="הזמנות" options={ORDER_SWITCH.map((item) => ({ ...item, active: item.href === "/orders" }))}>
+    <NightScreen sharedKey="orders" title="הזמנות" options={ORDER_SWITCH.map((item) => ({ ...item, active: item.href === "/orders" }))}>
       {loading ? <LoadingBlock /> : !allowed ? (
         <SheetEmpty icon="orders" text="אין הרשאה למסך הזה." />
       ) : (
@@ -71,9 +71,13 @@ export default function OrdersScreen() {
           <Chips items={TABS} value={tab} onChange={setTab} />
           {error ? <ErrorNote text={error} /> : null}
           <SectionList
+            style={{ flex: 1 }}
             sections={sections}
             keyExtractor={(order) => String(order.number)}
             stickySectionHeadersEnabled
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
             contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE + 12 }}
             refreshControl={refreshControl(refreshing, () => void refresh())}
             keyboardShouldPersistTaps="handled"

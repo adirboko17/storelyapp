@@ -386,6 +386,74 @@ export async function loadConnections(storeId: string) {
   });
 }
 
+export type CollectionWrite = {
+  title: string;
+  description: string;
+  productIds: string[];
+  conditions: unknown[];
+  excludeOutOfStock: boolean;
+  image: string;
+  hidden: boolean;
+};
+
+export async function saveStoreCollection(storeId: string, collection: CollectionWrite) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("save_store_collection", { target_store: storeId, collection });
+  if (error) throw new Error(hebrewError(error));
+}
+
+export type CustomerWrite = {
+  name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  zip: string;
+  note: string;
+  tags: string[];
+  subscribed: boolean;
+  sms: boolean;
+  locale: "he" | "en";
+};
+
+export async function createStoreCustomer(storeId: string, customer: CustomerWrite) {
+  return saveCustomer(storeId, null, { ...customer, credit: 0, whatsapp: false });
+}
+
+export async function updateStoreCustomer(storeId: string, customerId: string, customer: CustomerWrite & { credit: number; whatsapp: boolean }) {
+  await saveCustomer(storeId, customerId, customer);
+}
+
+async function saveCustomer(storeId: string, customerId: string | null, customer: CustomerWrite & { credit: number; whatsapp: boolean }) {
+  const supabase = await client();
+  const { data, error } = await supabase.rpc("save_store_customer", {
+    target_store: storeId,
+    customer_id: customerId,
+    customer_name: customer.name,
+    customer_email: customer.email,
+    customer_phone: customer.phone,
+    customer_street: customer.street,
+    customer_city: customer.city,
+    customer_zip: customer.zip,
+    replace_profile: true,
+    customer_note: customer.note,
+    customer_tags: customer.tags,
+    customer_subscribed: customer.subscribed,
+    customer_credit: customer.credit,
+    customer_locale: customer.locale,
+    customer_sms: customer.sms,
+    customer_whatsapp: customer.whatsapp,
+  });
+  if (error) throw new Error(hebrewError(error));
+  return typeof data === "string" ? data : "";
+}
+
+export async function reorderStoreCollections(storeId: string, titles: string[]) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("reorder_store_collections", { target_store: storeId, titles });
+  if (error) throw new Error(hebrewError(error));
+}
+
 export async function revokeConnection(storeId: string, connectionId: string) {
   const supabase = await client();
   const { error } = await supabase.rpc("revoke_my_mcp_connection", {

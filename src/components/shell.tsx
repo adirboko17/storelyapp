@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName } from "@/components/icon";
+import { useTabHeader } from "@/components/tab-header";
 import { AppText } from "@/components/ui";
 import { useFontSet } from "@/theme/fonts";
 import { SHEET_RADIUS, tokens } from "@/theme/tokens";
@@ -33,11 +34,15 @@ export function NightScreen({
   options,
   actions,
   children,
+  sharedKey,
+  onAdd,
 }: {
   title: string;
   options?: SwitchOption[];
   actions?: ReactNode;
   children: ReactNode;
+  sharedKey?: string;
+  onAdd?: () => void;
 }) {
   useStatusBar("light");
   const insets = useSafeAreaInsets();
@@ -45,15 +50,16 @@ export function NightScreen({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const switchable = Boolean(options && options.length > 1);
+  useTabHeader(sharedKey ? { kind: "compact", owner: sharedKey, title, switchable, add: Boolean(onAdd) } : null, { onSwitch: () => setOpen(true), onAdd });
   return (
     <View style={{ flex: 1, backgroundColor: tokens.night }}>
-      <View style={{ paddingTop: insets.top + 6, paddingHorizontal: 16, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
+      {sharedKey ? null : <View style={{ paddingTop: insets.top + 6, paddingHorizontal: 16, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
         <Pressable disabled={!switchable} onPress={() => setOpen(true)} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 4 }}>
           <AppText style={{ color: "#ffffff", fontFamily: fonts.bold, fontSize: 24 }} numberOfLines={1}>{title}</AppText>
           {switchable ? <Icon name="down" size={18} color="#ffffff" strokeWidth={2} /> : null}
         </Pressable>
         {actions}
-      </View>
+      </View>}
       <View style={{ flex: 1, backgroundColor: tokens.card, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, overflow: "hidden" }}>
         {children}
       </View>
@@ -86,30 +92,34 @@ export function SearchBar({
   placeholder,
   onSort,
   sortActive = false,
+  size = "regular",
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   onSort?: () => void;
   sortActive?: boolean;
+  size?: "regular" | "large";
 }) {
   const fonts = useFontSet();
+  const large = size === "large";
+  const bar = large ? 46 : 38;
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingTop: 12 }}>
-      <View style={{ flex: 1, height: 38, borderRadius: 10, backgroundColor: tokens.field, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10 }}>
-        <Icon name="search" size={16} color={tokens.inkSecondary} strokeWidth={1.8} />
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: large ? 16 : 12, paddingTop: large ? 14 : 12 }}>
+      <View style={{ flex: 1, height: bar, borderRadius: large ? 12 : 10, backgroundColor: tokens.field, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: large ? 14 : 10 }}>
+        <Icon name="search" size={large ? 18 : 16} color={tokens.inkSecondary} strokeWidth={1.8} />
         <TextInput
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
           placeholderTextColor="#8a8a8a"
           returnKeyType="search"
-          style={{ flex: 1, height: 38, fontFamily: fonts.regular, fontSize: 15, color: tokens.inkStrong, textAlign: "right", writingDirection: "rtl" }}
+          style={{ flex: 1, height: bar, fontFamily: fonts.regular, fontSize: large ? 17 : 15, color: tokens.inkStrong, textAlign: "right", writingDirection: "rtl" }}
         />
       </View>
       {onSort ? (
-        <Pressable onPress={onSort} style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: sortActive ? tokens.inkStrong : tokens.field }}>
-          <Icon name="sort" size={17} color={sortActive ? "#ffffff" : tokens.inkStrong} strokeWidth={1.8} />
+        <Pressable onPress={onSort} style={{ width: bar, height: bar, borderRadius: bar / 2, alignItems: "center", justifyContent: "center", backgroundColor: sortActive ? tokens.inkStrong : tokens.field }}>
+          <Icon name="sort" size={large ? 18 : 17} color={sortActive ? "#ffffff" : tokens.inkStrong} strokeWidth={1.8} />
         </Pressable>
       ) : null}
     </View>

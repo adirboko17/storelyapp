@@ -35,7 +35,7 @@ export default function ProductsScreen() {
   }, [products, query, tab, byName]);
 
   return (
-    <NightScreen title="מוצרים" options={PRODUCT_SWITCH.map((item) => ({ ...item, active: item.href === "/products" }))}>
+    <NightScreen sharedKey="products" title="מוצרים" options={PRODUCT_SWITCH.map((item) => ({ ...item, active: item.href === "/products" }))}>
       {loading ? <LoadingBlock /> : !allowed ? (
         <SheetEmpty icon="tag" text="אין הרשאה למסך הזה." />
       ) : (
@@ -44,8 +44,12 @@ export default function ProductsScreen() {
           <Chips items={TABS} value={tab} onChange={setTab} />
           {error ? <ErrorNote text={error} /> : null}
           <FlatList
+            style={{ flex: 1 }}
             data={rows}
             keyExtractor={(product) => product.id}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
             contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_SPACE + 12 }}
             refreshControl={refreshControl(refreshing, () => void refresh())}
             keyboardShouldPersistTaps="handled"

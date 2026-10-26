@@ -53,7 +53,6 @@ function match(query: string, text: string) {
 export function AreaList({ area }: { area: AreaKey }) {
   if (area === "returns") return <Returns />;
   if (area === "abandoned") return <Abandoned />;
-  if (area === "collections") return <Collections />;
   if (area === "inventory") return <Inventory />;
   if (area === "reviews") return <Reviews />;
   if (area === "gift-cards") return <GiftCards />;
@@ -128,30 +127,6 @@ function Abandoned() {
       keyExtractor={(item) => item.id}
       onPress={(item) => router.push(href("abandoned", item.id))}
       renderItem={(item) => <Line title={item.name || item.email || "עגלה"} meta={[hebrewWhen(item.updatedAt), item.total != null ? formatIls(item.total) : "", item.recovered ? "שוחזרה" : ""].filter(Boolean).join(" · ")} />}
-    />
-  );
-}
-
-function Collections() {
-  const router = useRouter();
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const { query, setQuery } = useQueryState();
-  const rows = snapshot?.collections;
-  const visible = (rows ?? []).filter((item) => match(query, item.title));
-  return (
-    <BrowseList
-      query={query}
-      onQuery={setQuery}
-      placeholder="חיפוש קטגוריות"
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={rows ? visible : []}
-      empty={rows ? "אין קטגוריות עדיין" : "הסנאפשוט לא כולל קטגוריות."}
-      keyExtractor={(item) => item.id}
-      onPress={(item) => router.push(href("collections", item.id))}
-      renderItem={(item) => <Line title={item.title} meta={[item.hidden ? "מוסתרת" : "גלויה", item.productIds ? `${formatCount(item.productIds.length)} מוצרים` : ""].filter(Boolean).join(" · ")} />}
     />
   );
 }

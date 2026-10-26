@@ -12,6 +12,7 @@ export type Membership = {
   storeId: string;
   displayName: string;
   memberName: string;
+  logoUrl: string;
 };
 
 type Phase = "booting" | "unconfigured" | "signed-out" | "resolving" | "no-store" | "pick-store" | "ready" | "blocked";
@@ -33,7 +34,12 @@ type SessionValue = {
 const SessionContext = createContext<SessionValue | null>(null);
 
 type MemberRow = { store_id: string; display_name: string | null };
-type SettingsRow = { store_id: string; display_name: string | null };
+type SettingsRow = { store_id: string; display_name: string | null; logo_url: string | null };
+
+function logoUrl(value: string | null | undefined) {
+  const url = value?.trim() ?? "";
+  return url.startsWith("https://") ? url : "";
+}
 
 function storeLabel(value: string | null | undefined) {
   const name = value?.trim();
@@ -95,10 +101,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     const rows = members.data ?? [];
     const names = new Map<string, string>();
+    const logos = new Map<string, string>();
     if (rows.length > 0) {
       const settings = await supabase
         .from("store_settings")
-        .select("store_id, display_name")
+        .select("store_id, display_name, logo_url")
         .in("store_id", rows.map((row) => row.store_id))
         .returns<SettingsRow[]>();
       if (request.current !== token) return;
@@ -107,12 +114,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setPhase("blocked");
         return;
       }
-      for (const row of settings.data ?? []) names.set(row.store_id, storeLabel(row.display_name));
+      for (const row of settings.data ?? []) {
+        names.set(row.store_id, storeLabel(row.display_name));
+        logos.set(row.store_id, logoUrl(row.logo_url));
+      }
     }
     const next = rows.map((row) => ({
       storeId: row.store_id,
       displayName: names.get(row.store_id) ?? "חנות ללא שם",
       memberName: row.display_name?.trim() || "",
+      logoUrl: logos.get(row.store_id) ?? "",
     }));
     setMemberships(next);
     if (next.length === 0) {

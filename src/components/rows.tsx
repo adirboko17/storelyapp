@@ -79,18 +79,22 @@ export function ProductRow({ product, onPress }: { product: ProductRecord; onPre
   );
 }
 
-export function CustomerRow({ person, onPress }: { person: CustomerRecord; onPress: () => void }) {
+export function CustomerRow({ person, spent, onPress }: { person: CustomerRecord; spent?: number; onPress: () => void }) {
   const fonts = useFontSet();
-  const meta = [
-    person.orders != null ? (person.orders === 1 ? "הזמנה אחת" : `${formatCount(person.orders)} הזמנות`) : "",
-    person.city,
-  ].filter(Boolean).join(" • ");
+  const place = [person.city, "ישראל"].filter(Boolean).join(", ");
+  const orders = person.orders != null ? (person.orders === 1 ? "הזמנה אחת" : `${formatCount(person.orders)} הזמנות`) : "";
+  const meta = [spent != null ? formatIls(spent) : "", orders].filter(Boolean).join(" • ");
   return (
     <FlatRow onPress={onPress}>
       <View style={{ gap: 3 }}>
-        <AppText style={{ fontFamily: fonts.bold, fontSize: 15, color: tokens.inkStrong }} numberOfLines={1}>{person.name || person.email || "ללא שם"}</AppText>
-        {person.email && person.name ? <AppText style={{ fontSize: 13, color: tokens.inkSecondary, writingDirection: "ltr", textAlign: "right" }} numberOfLines={1}>{person.email}</AppText> : null}
-        {meta ? <AppText style={{ fontSize: 13, color: tokens.inkSecondary }}>{meta}</AppText> : null}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong }} numberOfLines={1}>{person.name || person.email || "ללא שם"}</AppText>
+          {person.subscribed != null ? (
+            <Badge label={person.subscribed ? "מנוי לדיוור" : "לא מנוי"} background={person.subscribed ? tokens.activeBg : tokens.neutralBg} color={person.subscribed ? tokens.activeText : tokens.ink} />
+          ) : null}
+        </View>
+        <AppText style={{ fontSize: 14, color: tokens.inkSecondary }} numberOfLines={1}>{place}</AppText>
+        {meta ? <AppText style={{ fontSize: 14, color: tokens.inkSecondary }}>{meta}</AppText> : null}
       </View>
     </FlatRow>
   );
