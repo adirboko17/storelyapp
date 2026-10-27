@@ -17,9 +17,9 @@ function jwtRole(token: string) {
   }
 }
 
-export function publicConfigProblem(env: Record<string, string | undefined> = process.env) {
-  const url = env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
-  const key = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+export function publicConfigProblem() {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
   if (!url || !key) {
     return "חסרים EXPO_PUBLIC_SUPABASE_URL ו־EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. ההתחברות לא יצאה לדרך, ולא נשלחה קריאה לשרת.";
   }
