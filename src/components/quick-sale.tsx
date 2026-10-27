@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Share, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Keyboard, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from "react-native";
 import QRCode from "qrcode";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -345,8 +345,12 @@ export function QuickSaleScreen() {
                     )}
                   </View>
                   {line.kind === "product" ? (
-                    <Pressable onPress={() => { setPriceText(String(line.price)); setPriceKey(line.key); }} hitSlop={8}>
-                      <AppText style={{ fontSize: 15, writingDirection: "ltr", textDecorationLine: "underline" }}>{formatIls(line.price * line.quantity)}</AppText>
+                    <Pressable onPress={() => { setPriceText(String(line.price)); setPriceKey(line.key); }} hitSlop={8} style={editChip}>
+                      <AppText style={{ fontSize: 15, writingDirection: "ltr" }}>{formatIls(line.price * line.quantity)}</AppText>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Icon name="edit" size={13} color={tokens.inkStrong} />
+                        <AppText style={{ fontFamily: fonts.semibold, fontSize: 12, color: tokens.inkStrong }}>עריכת מחיר</AppText>
+                      </View>
                     </Pressable>
                   ) : (
                     <AppText style={{ fontSize: 15, writingDirection: "ltr" }}>{formatIls(line.price * line.quantity)}</AppText>
@@ -358,9 +362,15 @@ export function QuickSaleScreen() {
                   <AppText style={{ fontSize: 15 }}>סיכום ביניים</AppText>
                   <AppText style={{ fontSize: 15, writingDirection: "ltr" }}>{formatIls(subtotal)}</AppText>
                 </View>
-                <Pressable onPress={() => { setShippingText(shipping ? String(shipping) : ""); setShippingOpen(true); }} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <AppText style={{ fontSize: 15 }}>משלוח</AppText>
-                  <AppText style={{ fontSize: 15, writingDirection: "ltr", textDecorationLine: "underline" }}>{shipping === 0 ? "חינם" : formatIls(shipping)}</AppText>
+                <Pressable onPress={() => { setShippingText(shipping ? String(shipping) : ""); setShippingOpen(true); }} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: tokens.field, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
+                  <View style={{ gap: 2 }}>
+                    <AppText style={{ fontSize: 15 }}>משלוח</AppText>
+                    <AppText style={{ fontSize: 12, color: tokens.inkSecondary }}>לחצו כדי לשנות</AppText>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <AppText style={{ fontFamily: fonts.semibold, fontSize: 15, writingDirection: "ltr" }}>{shipping === 0 ? "חינם" : formatIls(shipping)}</AppText>
+                    <Icon name="edit" size={15} color={tokens.inkStrong} />
+                  </View>
                 </Pressable>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <AppText style={{ fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong }}>סה״כ</AppText>
@@ -434,44 +444,37 @@ export function QuickSaleScreen() {
         </ScrollView>
       ) : null}
 
-      <Modal visible={customOpen} transparent animationType="fade" onRequestClose={() => setCustomOpen(false)}>
-        <Pressable onPress={() => setCustomOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
-          <Pressable style={{ backgroundColor: "#ffffff", borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: insets.bottom + 16, gap: 12 }}>
-            <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>סכום חופשי</AppText>
-            <TextInput value={customText} onChangeText={setCustomText} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={tokens.inkSecondary} style={{ height: 48, borderRadius: 12, backgroundColor: PAGE, paddingHorizontal: 14, fontSize: 18, textAlign: "right", fontFamily: fonts.regular }} />
-            <Pressable onPress={saveCustom} style={{ height: 48, borderRadius: 24, backgroundColor: tokens.inkStrong, alignItems: "center", justifyContent: "center" }}>
-              <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>הוספה</AppText>
-            </Pressable>
-          </Pressable>
+      <LiftedSheet visible={customOpen} onClose={() => setCustomOpen(false)}>
+        <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>סכום חופשי</AppText>
+        <TextInput value={customText} onChangeText={setCustomText} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={tokens.inkSecondary} style={[amountInput, { fontFamily: fonts.regular }]} />
+        <Pressable onPress={saveCustom} style={sheetSave}>
+          <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>הוספה</AppText>
         </Pressable>
-      </Modal>
+      </LiftedSheet>
 
-      <Modal visible={priceKey != null} transparent animationType="fade" onRequestClose={() => setPriceKey(null)}>
-        <Pressable onPress={() => setPriceKey(null)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
-          <Pressable style={{ backgroundColor: "#ffffff", borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: insets.bottom + 16, gap: 12 }}>
-            <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>מחיר המוצר</AppText>
-            <TextInput value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={tokens.inkSecondary} style={{ height: 48, borderRadius: 12, backgroundColor: PAGE, paddingHorizontal: 14, fontSize: 18, textAlign: "right", fontFamily: fonts.regular }} />
-            <Pressable onPress={savePrice} style={{ height: 48, borderRadius: 24, backgroundColor: tokens.inkStrong, alignItems: "center", justifyContent: "center" }}>
-              <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>שמירה</AppText>
-            </Pressable>
-          </Pressable>
+      <LiftedSheet visible={priceKey != null} onClose={() => setPriceKey(null)}>
+        <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>מחיר המוצר</AppText>
+        <TextInput value={priceText} onChangeText={setPriceText} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={tokens.inkSecondary} style={[amountInput, { fontFamily: fonts.regular }]} />
+        <Pressable onPress={savePrice} style={sheetSave}>
+          <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>שמירה</AppText>
         </Pressable>
-      </Modal>
+      </LiftedSheet>
 
-      <Modal visible={shippingOpen} transparent animationType="fade" onRequestClose={() => setShippingOpen(false)}>
-        <Pressable onPress={() => setShippingOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
-          <Pressable style={{ backgroundColor: "#ffffff", borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: insets.bottom + 16, gap: 12 }}>
-            <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>משלוח</AppText>
-            <Pressable onPress={() => saveShipping(0)} style={payRow}>
-              <AppText style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 16 }}>משלוח חינם</AppText>
-            </Pressable>
-            <TextInput value={shippingText} onChangeText={setShippingText} keyboardType="decimal-pad" placeholder="סכום משלוח" placeholderTextColor={tokens.inkSecondary} style={{ height: 48, borderRadius: 12, backgroundColor: PAGE, paddingHorizontal: 14, fontSize: 18, textAlign: "right", fontFamily: fonts.regular }} />
-            <Pressable onPress={() => saveShipping(money(shippingText))} style={{ height: 48, borderRadius: 24, backgroundColor: tokens.inkStrong, alignItems: "center", justifyContent: "center" }}>
-              <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>שמירת סכום</AppText>
-            </Pressable>
-          </Pressable>
+      <LiftedSheet visible={shippingOpen} onClose={() => setShippingOpen(false)}>
+        <AppText style={{ fontFamily: fonts.bold, fontSize: 18 }}>משלוח</AppText>
+        <AppText style={{ fontSize: 14, color: tokens.inkSecondary }}>אפשר להשאיר משלוח חינם, או להקליד סכום.</AppText>
+        <Pressable onPress={() => saveShipping(0)} style={[payRow, shippingText.trim() ? null : { borderWidth: 1.5, borderColor: tokens.inkStrong, backgroundColor: "#ffffff" }]}>
+          {shippingText.trim() ? <View style={{ width: 18 }} /> : <Icon name="check" size={18} color={tokens.inkStrong} />}
+          <AppText style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 16 }}>משלוח חינם</AppText>
         </Pressable>
-      </Modal>
+        <View style={{ gap: 6 }}>
+          <AppText style={{ fontFamily: fonts.semibold, fontSize: 14 }}>סכום משלוח</AppText>
+          <TextInput value={shippingText} onChangeText={setShippingText} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={tokens.inkSecondary} style={[amountInput, { fontFamily: fonts.regular }]} />
+        </View>
+        <Pressable onPress={() => saveShipping(money(shippingText))} style={sheetSave}>
+          <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 16 }}>שמירת סכום</AppText>
+        </Pressable>
+      </LiftedSheet>
 
       <Modal visible={payOpen} transparent animationType="slide" onRequestClose={() => setPayOpen(false)}>
         <Pressable onPress={() => setPayOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
@@ -495,7 +498,41 @@ export function QuickSaleScreen() {
   );
 }
 
+function useKeyboardLift() {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, (event) => setHeight(event.endCoordinates.height));
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
+
+function LiftedSheet({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const keyboard = useKeyboardLift();
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: "flex-end", paddingBottom: keyboard }}>
+        <Pressable onPress={onClose} style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" }} />
+        <View style={{ backgroundColor: "#ffffff", borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: keyboard > 0 ? 16 : Math.max(insets.bottom, 16), gap: 12 }}>
+          <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: "#d0d0d0" }} />
+          {children}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const pillStyle = { alignSelf: "stretch" as const, height: 48, borderRadius: 14, backgroundColor: PAGE, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: 8 };
+const editChip = { backgroundColor: "#ffffff", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" as const, gap: 4 };
+const amountInput = { height: 56, borderRadius: 14, backgroundColor: PAGE, paddingHorizontal: 14, fontSize: 22, textAlign: "right" as const, color: tokens.inkStrong };
+const sheetSave = { height: 48, borderRadius: 24, backgroundColor: tokens.inkStrong, alignItems: "center" as const, justifyContent: "center" as const };
 const qtyButton = { width: 28, height: 28, borderRadius: 8, backgroundColor: "#ffffff", alignItems: "center" as const, justifyContent: "center" as const };
 const addButton = { width: 36, height: 36, borderRadius: 18, backgroundColor: PAGE, alignItems: "center" as const, justifyContent: "center" as const };
 const payRow = { height: 56, borderRadius: 14, backgroundColor: PAGE, paddingHorizontal: 14, flexDirection: "row" as const, alignItems: "center" as const, gap: 12 };
