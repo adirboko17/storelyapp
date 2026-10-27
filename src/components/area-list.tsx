@@ -13,7 +13,7 @@ import { AiSettings, GeneralSettings, PoliciesSettings, ShippingSettings, UsersS
 import { OrderRow } from "@/components/rows";
 import { Chips, FlatRow, SearchBar, SectionLabel, SheetEmpty, Thumb } from "@/components/shell";
 import { AppText, Badge, ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
-import { formatCount, formatIls, hebrewDay, hebrewTime } from "@/lib/format";
+import { checkoutLabel, formatCount, formatIls, hebrewDay, hebrewTime } from "@/lib/format";
 import { SEGMENTS, type AreaKey } from "@/lib/menu";
 import { AutomationsScreen, IntegrationsScreen, MessagesScreen } from "@/components/marketing-screens";
 import { deleteBlogPost, deleteStoreEvent } from "@/lib/content";
@@ -186,7 +186,7 @@ function CheckoutRow({ cart, onPress }: { cart: CheckoutRecord; onPress: () => v
     <FlatRow onPress={onPress}>
       <View style={{ gap: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong, writingDirection: "ltr" }} numberOfLines={1}>{`#${cart.id}`}</AppText>
+          <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong, writingDirection: "ltr" }} numberOfLines={1}>{checkoutLabel(cart.id)}</AppText>
           {cart.total != null ? <AppText style={{ fontSize: 15, color: tokens.inkStrong, writingDirection: "ltr" }}>{formatIls(cart.total)}</AppText> : null}
         </View>
         {meta ? <AppText style={{ color: tokens.inkSecondary, fontSize: 14 }} numberOfLines={1}>{meta}</AppText> : null}
@@ -213,7 +213,7 @@ function Abandoned() {
       if (tab === "open" && cart.recovered) return false;
       if (tab === "recovered" && !cart.recovered) return false;
       if (!needle) return true;
-      return `${cart.id} ${cart.name ?? ""} ${cart.email ?? ""} ${cart.phone ?? ""}`.toLowerCase().includes(needle);
+      return `${cart.id} ${checkoutLabel(cart.id)} ${cart.name ?? ""} ${cart.email ?? ""} ${cart.phone ?? ""}`.toLowerCase().includes(needle);
     });
     const groups: { title: string; data: CheckoutRecord[] }[] = [];
     list.forEach((cart) => {

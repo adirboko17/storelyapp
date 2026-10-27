@@ -6,6 +6,7 @@ export default function MoreLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: tokens.canvas } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="discounts" />
+      <Stack.Screen name="sale" />
     </Stack>
   );
 }

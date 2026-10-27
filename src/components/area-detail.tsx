@@ -8,7 +8,7 @@ import { Icon } from "@/components/icon";
 import { CustomerRow } from "@/components/rows";
 import { SearchBar, Thumb } from "@/components/shell";
 import { AppText, Badge, EmptyState, ErrorNote, LoadingBlock, PrimaryButton } from "@/components/ui";
-import { formatCount, formatIls, hebrewDate, hebrewWhen } from "@/lib/format";
+import { checkoutLabel, formatCount, formatIls, hebrewDate, hebrewWhen } from "@/lib/format";
 import { SEGMENTS, type AreaKey } from "@/lib/menu";
 import { ReportView } from "@/components/analytics";
 import { AutomationView, MessageView } from "@/components/marketing-screens";
@@ -132,7 +132,7 @@ function CheckoutDetail({ id }: { id: string }) {
       ) : null}
 
       <View style={{ backgroundColor: tokens.card, paddingHorizontal: 16, paddingVertical: 16, gap: 8 }}>
-        <AppText style={{ fontFamily: fonts.bold, fontSize: 22, lineHeight: 28, color: tokens.inkStrong, writingDirection: "ltr" }}>{`#${item.id}`}</AppText>
+        <AppText style={{ fontFamily: fonts.bold, fontSize: 22, lineHeight: 28, color: tokens.inkStrong, writingDirection: "ltr" }}>{checkoutLabel(item.id)}</AppText>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
           <Badge label={item.recovered ? "שוחזרה" : "לא שוחזרה"} background={item.recovered ? "#cdfee1" : "#ffd6a4"} color={item.recovered ? "#0c5132" : "#5e4200"} />
           <Badge label={item.reminded ? "נשלח מייל" : "המייל לא נשלח"} background={item.reminded ? "#e0f0ff" : "#ffd6a4"} color={item.reminded ? "#00527c" : "#5e4200"} />

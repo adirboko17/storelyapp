@@ -1,0 +1,6 @@
+declare module "qrcode" {
+  function create(text: string, options?: { errorCorrectionLevel?: "L" | "M" | "Q" | "H" }): {
+    modules: { size: number; get(row: number, col: number): number | boolean };
+  };
+  export default { create };
+}

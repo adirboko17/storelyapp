@@ -92,7 +92,7 @@ export function FloatingTabBar({ state, navigateToTab, allowed }: BottomTabBarPr
   useEffect(() => {
     if (selected.get() !== active) selected.set(active);
   }, [active, selected]);
-  if (pathname === "/more") return null;
+  if (pathname === "/more" || pathname.startsWith("/more/sale")) return null;
   const go = (name: string) => {
     const route = state.routes.find((item) => item.name === name);
     if (route) navigateToTab(route.key);

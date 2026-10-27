@@ -25,7 +25,7 @@ function area(key: string): NavChild {
 
 const NAV: NavItem[] = [
   { key: "home", label: "בית", icon: "home", href: "/" },
-  { key: "orders", label: "הזמנות", icon: "orders", href: "/orders", permission: "orders.read", children: [{ label: "הזמנות", href: "/orders", permission: "orders.read" }, area("returns"), area("abandoned")] },
+  { key: "orders", label: "הזמנות", icon: "orders", href: "/orders", permission: "orders.read", children: [{ label: "הזמנות", href: "/orders", permission: "orders.read" }, { label: "מכירה מהירה", href: "/more/sale", permission: "orders.read" }, area("returns"), area("abandoned")] },
   { key: "products", label: "מוצרים", icon: "tag", href: "/products", permission: "products.read", children: [{ label: "מוצרים", href: "/products", permission: "products.read" }, area("collections"), area("inventory"), area("reviews"), area("gift-cards")] },
   { key: "customers", label: "לקוחות", icon: "user", href: "/customers", permission: "customers.read", children: [{ label: "לקוחות", href: "/customers", permission: "customers.read" }, area("segments")] },
   { key: "growth", label: "צמיחה", icon: "growth", href: "/more/area/growth", permission: "analytics.read", children: [area("growth"), area("attribution")] },
@@ -210,8 +210,8 @@ export function AppMenu({ onDismiss, onNavigate }: { onDismiss: () => void; onNa
         <GlassControl target={blurTarget} width={DOCK} onPress={() => setSettings(true)}>
           <Icon name="gear" size={24} color="#ffffff" strokeWidth={1.7} />
         </GlassControl>
-        <GlassControl target={blurTarget} onPress={() => { if (storeUrl) void Linking.openURL(storeUrl); }}>
-          <Icon name="broadcast" size={20} color="#ffffff" strokeWidth={1.8} />
+        <GlassControl target={blurTarget} onPress={() => go("/more/sale")}>
+          <Icon name="bolt" size={20} color="#ffffff" strokeWidth={1.8} />
           <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, fontSize: 17 }}>Quick Sale</AppText>
         </GlassControl>
         <GlassControl target={blurTarget} width={DOCK} onPress={onDismiss}>

@@ -80,6 +80,12 @@ export function compactCount(value: number) {
   return String(Math.round(value));
 }
 
+export function checkoutLabel(id: string) {
+  const hex = id.replace(/-/g, "");
+  if (/^[0-9a-f]{32}$/i.test(hex)) return `#${hex.slice(0, 12)}`;
+  return id.startsWith("#") ? id : `#${id}`;
+}
+
 export function hebrewDate(value: string | undefined) {
   if (!value) return "";
   const date = new Date(value);
