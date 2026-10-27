@@ -8,6 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.storely.admin",
       "supportsTablet": true
     },
     "android": {
@@ -43,9 +44,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#fafafa",
-          "image": "./assets/brand/storely-logo.png",
-          "imageWidth": 76
+          "backgroundColor": "#071018",
+          "image": "./assets/brand/storely-mark.png",
+          "imageWidth": 96
         }
       ],
       "@react-native-community/datetimepicker",

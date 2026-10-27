@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Logo } from "@/components/logo";
 import { AppText, PrimaryButton } from "@/components/ui";
 import { publicConfigProblem } from "@/lib/config";
 import { useSession } from "@/lib/session";
@@ -187,7 +186,7 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
   return (
     <View style={{ flex: 1, backgroundColor: tokens.login }}>
       <LinearGradient
-        colors={["rgba(62,92,74,0.55)", "rgba(12,16,14,0.2)", tokens.login]}
+        colors={["rgba(150,205,255,0.72)", "rgba(28,72,140,0.28)", tokens.login]}
         locations={[0, 0.46, 0.78]}
         style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
         start={{ x: 0.5, y: 0.2 }}
@@ -196,7 +195,7 @@ function LoginFrame({ children }: { children: React.ReactNode }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={{ paddingTop: insets.top + 18, paddingHorizontal: 28, flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Logo height={30} />
+            <Image source={require("../../assets/brand/storely-mark.png")} style={{ width: 26, height: 34 }} resizeMode="contain" accessibilityIgnoresInvertColors />
             <AppText style={{ color: "#ffffff", fontFamily: fonts.bold, fontSize: 22, letterSpacing: -0.8 }}>storely</AppText>
           </View>
           <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 16, paddingVertical: 32 }}>

@@ -4,7 +4,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { LoadingBlock } from "@/components/ui";
+import { BootScreen } from "@/components/brand-loading";
 import { SessionProvider, useSession } from "@/lib/session";
 import { FontGate } from "@/theme/fonts";
 import { tokens } from "@/theme/tokens";
@@ -42,7 +42,7 @@ function RootNavigator() {
     if (session.phase === "ready" && group === "(auth)" && screen !== "pick-store") router.replace("/");
   }, [booting, group, router, screen, session.phase]);
 
-  if (booting) return <LoadingBlock label="טוען את הניהול…" />;
+  if (booting) return <BootScreen />;
 
   const dark = group === "(auth)" && screen === "login";
   return (

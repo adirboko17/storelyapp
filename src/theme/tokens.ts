@@ -13,7 +13,7 @@ export const tokens = {
   negative: "#8e1f0b",
   shell: "#1a1a1a",
   card: "#ffffff",
-  login: "#070a08",
+  login: "#071018",
   fieldBorder: "#8a8a8a",
   hover: "#f7f7f7",
   warnBg: "#ffeb78",

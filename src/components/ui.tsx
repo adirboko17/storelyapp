@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, RefreshControl, Text, TextInput, View, type TextProps } from "react-native";
+import { Pressable, RefreshControl, Text, TextInput, View, type TextProps } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BrandMark } from "@/components/brand-loading";
 import { Icon } from "@/components/icon";
 import { Logo } from "@/components/logo";
 import { useFontSet } from "@/theme/fonts";
@@ -83,11 +84,10 @@ export function ErrorNote({ text }: { text: string }) {
   );
 }
 
-export function LoadingBlock({ label = "טוען…" }: { label?: string }) {
+export function LoadingBlock(_props?: { label?: string }) {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tokens.canvas, gap: 10 }}>
-      <ActivityIndicator color={tokens.inkStrong} />
-      <AppText style={{ color: tokens.inkSecondary }}>{label}</AppText>
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: tokens.canvas }}>
+      <BrandMark size={72} />
     </View>
   );
 }
