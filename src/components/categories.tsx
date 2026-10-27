@@ -1,24 +1,17 @@
 import { useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from "react-native";
+import { FlatList, Pressable, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName } from "@/components/icon";
 import { NightScreen, SearchBar, SheetEmpty, type SwitchOption } from "@/components/shell";
 import { AppText, ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
 import { formatCount } from "@/lib/format";
-import { reorderStoreCollections, saveStoreCollection } from "@/lib/remote";
+import { reorderStoreCollections } from "@/lib/remote";
 import { useSession } from "@/lib/session";
 import { useStoreData } from "@/lib/store-data";
 import type { CollectionRecord } from "@/lib/snapshot";
 import { useFontSet } from "@/theme/fonts";
 import { TAB_SPACE, tokens } from "@/theme/tokens";
-
-type Sheet = "menu" | "subcategory";
-
-function sameName(left: string, right: string) {
-  return left.trim().localeCompare(right.trim(), "he", { sensitivity: "accent" }) === 0;
-}
 
 function HeaderButton({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
   return (
@@ -109,16 +102,10 @@ export function CategoriesScreen({
 }) {
   const fonts = useFontSet();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { storeId } = useSession();
   const { snapshot, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
   const [order, setOrder] = useState<string[] | null>(null);
-  const [sheet, setSheet] = useState<Sheet | null>(null);
-  const [name, setName] = useState("");
-  const [parentId, setParentId] = useState("");
-  const [menuNote, setMenuNote] = useState("");
-  const [formError, setFormError] = useState("");
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
@@ -192,72 +179,6 @@ export function CategoriesScreen({
     }
   }
 
-  function openCategory() {
-    setSheet(null);
-    router.push("/more/area/collections/new" as Href);
-  }
-
-  function openSubcategory() {
-    if (!catalog?.length) {
-      setMenuNote("קודם מוסיפים קטגוריה.");
-      return;
-    }
-    setParentId(catalog[0]?.id ?? "");
-    setName("");
-    setFormError("");
-    setSheet("subcategory");
-  }
-
-  async function submit() {
-    if (saving.current) return;
-    const title = name.trim();
-    if (!title) {
-      setFormError("הקלידו שם.");
-      return;
-    }
-    if (!storeId) {
-      setFormError("אין חנות נבחרת.");
-      return;
-    }
-    const list = catalog ?? [];
-    const parent = list.find((item) => item.id === parentId) ?? list[0];
-    if (!parent) {
-      setFormError("קודם מוסיפים קטגוריה.");
-      return;
-    }
-    if (parent.subcategories.some((item) => sameName(item, title))) {
-      setFormError("יש כבר תת קטגוריה בשם הזה.");
-      return;
-    }
-    if (!parent.productIds || !parent.conditions) {
-      setFormError("חסרים פרטי הקטגוריה. משכו את הרשימה לרענון ונסו שוב.");
-      return;
-    }
-    const kept = parent.conditions.filter((rule) => !rule || typeof rule !== "object" || (rule as { field?: unknown }).field !== "subcategory");
-    saving.current = true;
-    setBusy(true);
-    setFormError("");
-    try {
-      await saveStoreCollection(storeId, {
-        title: parent.title,
-        description: parent.description ?? "",
-        productIds: parent.productIds,
-        conditions: [...kept, ...[...parent.subcategories, title].map((value) => ({ field: "subcategory", op: "is", value }))],
-        excludeOutOfStock: parent.excludeOutOfStock === true,
-        image: parent.image ?? "",
-        hidden: parent.hidden === true,
-      });
-      setSheet(null);
-      setName("");
-      await refresh();
-    } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : "לא הצלחנו להוסיף את התת קטגוריה.");
-    } finally {
-      saving.current = false;
-      setBusy(false);
-    }
-  }
-
   const actions = !loading && allowed ? (
     ordering ? (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
@@ -270,13 +191,11 @@ export function CategoriesScreen({
       </View>
     ) : (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <HeaderButton icon="plus" label="הוספת קטגוריה או תת קטגוריה" onPress={() => { setMenuNote(""); setSheet("menu"); }} />
+        <HeaderButton icon="plus" label="הוספת קטגוריה" onPress={() => router.push("/more/area/collections/new" as Href)} />
         <HeaderButton icon="dots" label="שינוי סדר הקטגוריות" onPress={beginOrder} />
       </View>
     )
   ) : undefined;
-
-  const parent = catalog?.find((item) => item.id === parentId) ?? catalog?.[0];
 
   return (
     <NightScreen title={title} options={options} actions={actions}>
@@ -312,90 +231,6 @@ export function CategoriesScreen({
           />
         </View>
       )}
-      <Modal visible={sheet != null} transparent animationType="slide" onRequestClose={() => { if (!busy) setSheet(null); }}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Pressable onPress={() => { if (!busy) setSheet(null); }} style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" }} />
-          <View style={{ backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 16) + 8, direction: "rtl" }}>
-              <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: "#d4d4d4", marginBottom: 8 }} />
-              {sheet === "subcategory" ? (
-                <View style={{ paddingHorizontal: 16, gap: 12, paddingTop: 8 }}>
-                  <AppText style={{ fontFamily: fonts.bold, fontSize: 18, color: tokens.inkStrong }}>הוספת תת קטגוריה</AppText>
-                  {sheet === "subcategory" && parent ? (
-                    catalog && catalog.length > 1 ? (
-                      <FlatList
-                          style={{ maxHeight: 220 }}
-                          data={catalog}
-                          keyExtractor={(item) => item.id}
-                          keyboardShouldPersistTaps="handled"
-                          renderItem={({ item }) => {
-                            const on = item.id === parent.id;
-                            return (
-                              <Pressable onPress={() => setParentId(item.id)} style={{ height: 48, flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                <AppText style={{ flex: 1, fontSize: 16, fontFamily: on ? fonts.bold : fonts.regular, color: tokens.inkStrong }} numberOfLines={1}>{item.title}</AppText>
-                                {on ? <Icon name="check" size={16} color={tokens.inkStrong} strokeWidth={2} /> : null}
-                              </Pressable>
-                            );
-                          }}
-                        />
-                    ) : (
-                      <AppText style={{ fontSize: 16, color: tokens.inkSecondary }}>{`בתוך ${parent.title}`}</AppText>
-                    )
-                  ) : null}
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    autoFocus
-                    maxLength={80}
-                    placeholder="שם התת קטגוריה"
-                    placeholderTextColor="#8a8a8a"
-                    onSubmitEditing={() => void submit()}
-                    style={{ height: 52, borderRadius: 12, backgroundColor: tokens.field, paddingHorizontal: 14, fontFamily: fonts.regular, fontSize: 17, color: tokens.inkStrong, textAlign: "right", writingDirection: "rtl" }}
-                  />
-                  {formError ? <AppText style={{ color: tokens.negative, fontSize: 15 }}>{formError}</AppText> : null}
-                  <Pressable accessibilityRole="button" onPress={() => void submit()} disabled={busy} style={{ height: 48, borderRadius: 12, backgroundColor: tokens.inkStrong, alignItems: "center", justifyContent: "center", opacity: busy ? 0.7 : 1 }}>
-                    <AppText style={{ color: "#ffffff", fontFamily: fonts.bold, fontSize: 16 }}>{busy ? "שומר…" : "שמירה"}</AppText>
-                  </Pressable>
-                </View>
-              ) : (
-                <View style={{ paddingTop: 4 }}>
-                  <AppText style={{ textAlign: "center", fontFamily: fonts.semibold, fontSize: 13, color: tokens.inkSecondary, paddingBottom: 14 }}>הוספה</AppText>
-                  <AddOption icon="tag" title="קטגוריה" detail="קבוצת מוצרים חדשה בחנות" onPress={openCategory} />
-                  <AddOption icon="layers" title="תת קטגוריה" detail="בתוך קטגוריה שכבר קיימת" onPress={openSubcategory} />
-                  {menuNote ? <AppText style={{ color: tokens.negative, fontSize: 14, paddingHorizontal: 20, paddingBottom: 8 }}>{menuNote}</AppText> : null}
-                </View>
-              )}
-            </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </NightScreen>
-  );
-}
-
-function AddOption({ icon, title, detail, onPress }: { icon: IconName; title: string; detail: string; onPress: () => void }) {
-  const fonts = useFontSet();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        marginHorizontal: 16,
-        marginBottom: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-        borderRadius: 18,
-        backgroundColor: pressed ? "#ececec" : "#f4f4f4",
-      })}
-    >
-      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
-        <Icon name={icon} size={20} color={tokens.inkStrong} strokeWidth={1.7} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <AppText style={{ fontFamily: fonts.semibold, fontSize: 16, color: tokens.inkStrong }}>{title}</AppText>
-        <AppText style={{ fontSize: 13, color: tokens.inkSecondary }}>{detail}</AppText>
-      </View>
-      <Icon name="forward" size={16} color="#c4c4c4" strokeWidth={2} />
-    </Pressable>
   );
 }

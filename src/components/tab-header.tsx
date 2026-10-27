@@ -192,14 +192,14 @@ function CompactChrome({ title, switchable, add }: { title: string; switchable: 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="הוספה"
-          hitSlop={8}
+          hitSlop={6}
           onPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => undefined);
             headerHandlers.onAdd?.();
           }}
-          style={({ pressed }) => ({ width: 34, height: 34, borderRadius: 17, borderWidth: 1.6, borderColor: "#ffffff", alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+          style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: tokens.nightRaised, opacity: pressed ? 0.55 : 1 })}
         >
-          <Icon name="plus" size={18} color="#ffffff" strokeWidth={2.2} />
+          <Icon name="plus" size={18} color="#ffffff" strokeWidth={2} />
         </Pressable>
       ) : null}
     </View>

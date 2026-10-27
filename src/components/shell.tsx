@@ -1,5 +1,5 @@
-import { useCallback, useState, type ReactNode } from "react";
-import { Image, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { Image, Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -49,7 +49,20 @@ export function NightScreen({
   const fonts = useFontSet();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const pending = useRef<string | null>(null);
   const switchable = Boolean(options && options.length > 1);
+
+  function go(href: string) {
+    setOpen(false);
+    if (Platform.OS === "ios") pending.current = href;
+    else router.navigate(href as never);
+  }
+
+  function landed() {
+    const href = pending.current;
+    pending.current = null;
+    if (href) router.navigate(href as never);
+  }
   useTabHeader(sharedKey ? { kind: "compact", owner: sharedKey, title, switchable, add: Boolean(onAdd) } : null, { onSwitch: () => setOpen(true), onAdd });
   return (
     <View style={{ flex: 1, backgroundColor: tokens.night }}>
@@ -63,15 +76,15 @@ export function NightScreen({
       <View style={{ flex: 1, backgroundColor: tokens.card, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, overflow: "hidden" }}>
         {children}
       </View>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} onDismiss={landed}>
         <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", paddingTop: insets.top + 52, paddingHorizontal: 12 }}>
           <View style={{ alignSelf: "flex-start", minWidth: 220, backgroundColor: tokens.card, borderRadius: 14, paddingVertical: 6, direction: "rtl" }}>
             {(options ?? []).map((option) => (
               <Pressable
                 key={option.label}
                 onPress={() => {
-                  setOpen(false);
-                  if (option.href && !option.active) router.push(option.href as never);
+                  if (option.href && !option.active) go(option.href);
+                  else setOpen(false);
                 }}
                 style={{ height: 44, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8 }}
               >
@@ -92,6 +105,8 @@ export function SearchBar({
   placeholder,
   onSort,
   sortActive = false,
+  onFilter,
+  filterActive = false,
   size = "regular",
 }: {
   value: string;
@@ -99,6 +114,8 @@ export function SearchBar({
   placeholder: string;
   onSort?: () => void;
   sortActive?: boolean;
+  onFilter?: () => void;
+  filterActive?: boolean;
   size?: "regular" | "large";
 }) {
   const fonts = useFontSet();
@@ -120,6 +137,11 @@ export function SearchBar({
       {onSort ? (
         <Pressable onPress={onSort} style={{ width: bar, height: bar, borderRadius: bar / 2, alignItems: "center", justifyContent: "center", backgroundColor: sortActive ? tokens.inkStrong : tokens.field }}>
           <Icon name="sort" size={large ? 18 : 17} color={sortActive ? "#ffffff" : tokens.inkStrong} strokeWidth={1.8} />
+        </Pressable>
+      ) : null}
+      {onFilter ? (
+        <Pressable onPress={onFilter} accessibilityLabel="סינון" style={{ width: bar, height: bar, borderRadius: bar / 2, alignItems: "center", justifyContent: "center", backgroundColor: filterActive ? tokens.inkStrong : tokens.field }}>
+          <Icon name="filter" size={large ? 18 : 17} color={filterActive ? "#ffffff" : tokens.inkStrong} strokeWidth={1.8} />
         </Pressable>
       ) : null}
     </View>
@@ -150,10 +172,10 @@ export function SectionLabel({ text }: { text: string }) {
   );
 }
 
-export function FlatRow({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
+export function FlatRow({ children, onPress, onLongPress }: { children: ReactNode; onPress?: () => void; onLongPress?: () => void }) {
   const body = <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: tokens.line, backgroundColor: tokens.card }}>{children}</View>;
-  if (!onPress) return body;
-  return <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>{body}</Pressable>;
+  if (!onPress && !onLongPress) return body;
+  return <Pressable onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>{body}</Pressable>;
 }
 
 export function Thumb({ uri, size = 40 }: { uri?: string; size?: number }) {

@@ -1,34 +1,86 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Pressable, RefreshControl, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
+import Svg, { Circle, Defs, Line, LinearGradient as SvgGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Animated, { Easing, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { AccountSheet } from "@/components/account-sheet";
+import { AlertsSheet } from "@/components/alerts-sheet";
 import { Icon, type IconName } from "@/components/icon";
-import { SalesChart } from "@/components/sales-chart";
 import { initials, useStatusBar } from "@/components/shell";
 import { useTabHeader } from "@/components/tab-header";
-import { AppText, Badge, ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
+import { TrafficPager, type RangeKey } from "@/components/traffic-pager";
+import { AppText, Badge, ErrorNote, LoadingBlock } from "@/components/ui";
 import { allows } from "@/lib/access";
-import { compactCount, compactIls, formatCount, formatIls, hebrewTime } from "@/lib/format";
+import { formatCount, formatIls, hebrewTime } from "@/lib/format";
 import { FULFILLMENT_BADGE, PAY_BADGE, knownBadge } from "@/lib/orders";
-import { loadTraffic, useStoreCall, type TrafficSnapshot } from "@/lib/remote";
+import { loadTraffic, useStoreCall } from "@/lib/remote";
 import { useSession } from "@/lib/session";
 import { sortedOrders } from "@/lib/snapshot";
 import { useStoreData, useStoreTitle } from "@/lib/store-data";
 import { useFontSet } from "@/theme/fonts";
 import { SHEET_RADIUS, TAB_SPACE, tokens } from "@/theme/tokens";
 
-type Metric = "sales" | "orders" | "conversion";
-
 function jerusalemHour() {
   return Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Asia/Jerusalem" }).format(new Date())) % 24;
 }
 
-function greeting(hour: number) {
-  if (hour < 5) return "לילה טוב";
-  if (hour < 12) return "בוקר טוב";
-  if (hour < 17) return "צהריים טובים";
-  if (hour < 21) return "ערב טוב";
-  return "לילה טוב";
+type Sky = "morning" | "noon" | "evening" | "night";
+type Greeting = { text: string; sky: Sky };
+
+const NIGHT: Greeting = { text: "לילה טוב", sky: "night" };
+
+function greeting(hour: number): Greeting {
+  if (hour < 5) return NIGHT;
+  if (hour < 12) return { text: "בוקר טוב", sky: "morning" };
+  if (hour < 17) return { text: "צהריים טובים", sky: "noon" };
+  if (hour < 19) return { text: "ערב טוב", sky: "evening" };
+  if (hour < 23) return { text: "ערב טוב", sky: "night" };
+  return NIGHT;
+}
+
+const SKY: Record<Sky, { sky: [string, string, string]; sun: string; halo: string; hill: string; sunAt: [number, number, number] }> = {
+  morning: { sky: ["#dcecff", "#fff1e0", "#ffe0bf"], sun: "#ffb547", halo: "#ffcf8a", hill: "#f1d9c2", sunAt: [96, 116, 20] },
+  noon: { sky: ["#d6eaff", "#eaf4ff", "#f6faff"], sun: "#ffcc33", halo: "#ffe38a", hill: "#dfe9e4", sunAt: [318, 40, 17] },
+  evening: { sky: ["#e6d9ff", "#ffd3c0", "#ffbb98"], sun: "#ff8a52", halo: "#ffb085", hill: "#f0c1ae", sunAt: [300, 122, 24] },
+  night: { sky: ["#c9c3f0", "#dedaf6", "#ecebfa"], sun: "#ffffff", halo: "#ffffff", hill: "#d5d1ee", sunAt: [318, 38, 13] },
+};
+
+const NIGHT_STARS: [number, number, number][] = [[60, 30, 1.6], [104, 52, 1.1], [150, 22, 1.3], [236, 40, 1.1], [270, 18, 1.5], [366, 64, 1.2], [30, 70, 1]];
+
+function GreetingSky({ sky }: { sky: Sky }) {
+  const look = SKY[sky];
+  const [cx, cy, r] = look.sunAt;
+  return (
+    <Svg pointerEvents="none" width="100%" height="100%" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}>
+      <Defs>
+        <SvgGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={look.sky[0]} />
+          <Stop offset="0.6" stopColor={look.sky[1]} />
+          <Stop offset="1" stopColor={look.sky[2]} />
+        </SvgGradient>
+        <RadialGradient id="halo" cx={cx} cy={cy} r={r * 3.2} gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={look.halo} stopOpacity={sky === "night" ? 0.5 : 0.75} />
+          <Stop offset="1" stopColor={look.halo} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width="400" height="150" fill="url(#sky)" />
+      {sky === "night" ? NIGHT_STARS.map(([x, y, size]) => <Circle key={`${x}-${y}`} cx={x} cy={y} r={size} fill="#ffffff" opacity={0.9} />) : null}
+      <Circle cx={cx} cy={cy} r={r * 3.2} fill="url(#halo)" />
+      {sky === "night" ? (
+        <Path d={`M${cx} ${cy - r} A${r} ${r} 0 1 0 ${cx} ${cy + r} A${r * 1.25} ${r * 1.25} 0 0 1 ${cx} ${cy - r} Z`} fill="#ffffff" />
+      ) : (
+        <Circle cx={cx} cy={cy} r={r} fill={look.sun} />
+      )}
+      {sky === "noon" ? (
+        <>
+          <Path d="M58 52 h52 a11 11 0 0 0 -16 -14 a15 15 0 0 0 -27 2 a10 10 0 0 0 -9 12z" fill="#ffffff" opacity={0.9} />
+          <Path d="M196 30 h38 a8 8 0 0 0 -11 -10 a11 11 0 0 0 -20 2 a7 7 0 0 0 -7 8z" fill="#ffffff" opacity={0.75} />
+        </>
+      ) : null}
+      <Path d="M0 122 C 60 104, 130 108, 190 118 S 320 102, 400 114 L400 150 L0 150 Z" fill={look.hill} />
+      <Path d="M0 136 C 70 122, 150 126, 220 135 S 340 124, 400 131 L400 150 L0 150 Z" fill={HOME_BG} />
+    </Svg>
+  );
 }
 
 function firstName(name: string | null | undefined) {
@@ -41,15 +93,6 @@ const HOME_BG = tokens.canvas;
 
 type Task = { key: string; icon: IconName; label: string; count: number; tint: string; ink: string; onPress: () => void };
 
-function sumTo(values: number[], hour: number) {
-  return values.slice(0, hour + 1).reduce((sum, value) => sum + value, 0);
-}
-
-function delta(current: number, previous: number) {
-  if (!previous) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
 export default function HomeScreen() {
   useStatusBar("light");
   const fonts = useFontSet();
@@ -57,12 +100,13 @@ export default function HomeScreen() {
   const title = useStoreTitle();
   const { email, memberships, storeId, selectStore, signOut } = useSession();
   const [accountsOpen, setAccountsOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const { snapshot, access, loading, refreshing, error, refresh } = useStoreData();
   const canTraffic = allows(access, "analytics.read") || allows(access, "analytics.live");
   const load = useCallback(async (id: string) => (canTraffic ? loadTraffic(id) : null), [canTraffic]);
   const traffic = useStoreCall(load);
-  const [metric, setMetric] = useState<Metric>("sales");
-  const [day, setDay] = useState<"today" | "yesterday">("today");
+  const [range, setRange] = useState<RangeKey>("today");
+  const canLive = allows(access, "analytics.live");
   const member = memberships.find((item) => item.storeId === storeId);
   const person = access?.name?.trim() || member?.memberName || email || title;
   const name = firstName(access?.name || member?.memberName);
@@ -71,6 +115,34 @@ export default function HomeScreen() {
     void refresh();
     void traffic.refresh();
   }, [refresh, traffic]);
+  const refreshingNow = refreshing || traffic.refreshing;
+  const pull = useSharedValue(0);
+  const turn = useSharedValue(0);
+  const spinning = useSharedValue(0);
+  useEffect(() => {
+    spinning.set(refreshingNow ? 1 : 0);
+    if (!refreshingNow) {
+      turn.set(0);
+      return;
+    }
+    turn.set(withRepeat(withTiming(1, { duration: 760, easing: Easing.linear }), -1, false));
+    return () => {
+      turn.set(0);
+    };
+  }, [refreshingNow, spinning, turn]);
+  const onPull = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      pull.set(Math.max(0, -event.contentOffset.y));
+    },
+  });
+  const refreshMark = useAnimatedStyle(() => {
+    const shown = spinning.get() > 0 ? 1 : Math.min(1, Math.max(0, (pull.get() - 8) / 44));
+    const angle = spinning.get() > 0 ? turn.get() * 360 : Math.min(pull.get() * 2.2, 180);
+    return {
+      opacity: shown,
+      transform: [{ scale: 0.72 + shown * 0.28 }, { rotate: `${angle}deg` }],
+    };
+  });
   const tasks = useMemo(() => {
     const canOrders = allows(access, "orders.read");
     const orderList = canOrders ? snapshot?.orders : undefined;
@@ -85,7 +157,7 @@ export default function HomeScreen() {
 
   useTabHeader(
     { kind: "home", owner: "home", title, initials: initials(person), logoUrl: member?.logoUrl ?? "" },
-    { onAvatar: () => setAccountsOpen(true), onBell: () => router.push("/orders") },
+    { onAvatar: () => setAccountsOpen(true), onBell: () => setAlertsOpen(true) },
   );
 
   const accounts = (
@@ -112,12 +184,14 @@ export default function HomeScreen() {
       <View style={{ flex: 1, backgroundColor: tokens.night }}>
         <LoadingBlock />
         {accounts}
+        <AlertsSheet visible={alertsOpen} onClose={() => setAlertsOpen(false)} />
       </View>
     );
   }
 
   const { toFulfill, unpaid, soldOut, carts, recent } = tasks;
   const hour = jerusalemHour();
+  const hello = greeting(hour);
   const todo = ([
     { key: "fulfill", icon: "box", label: "הזמנות לטיפול", count: toFulfill ?? 0, tint: "#fff1e3", ink: "#8a4b00", onPress: () => router.push("/orders?tab=unfulfilled" as Href) },
     { key: "unpaid", icon: "receipt", label: "ממתינות לתשלום", count: unpaid ?? 0, tint: tokens.warnBg, ink: tokens.warnText, onPress: () => router.push("/orders?tab=unpaid" as Href) },
@@ -128,31 +202,42 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.night }}>
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 0 }}
-        refreshControl={refreshControl(refreshing || traffic.refreshing, refreshAll)}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshingNow}
+            onRefresh={refreshAll}
+            tintColor="transparent"
+            colors={["#ffffff"]}
+            progressBackgroundColor={tokens.night}
+          />
+        )}
+        onScroll={onPull}
+        scrollEventThrottle={16}
         style={{ backgroundColor: tokens.night }}
       >
         {canTraffic ? (
-          <TrafficPanel
-            data={traffic.data}
-            loading={traffic.loading}
-            error={traffic.error}
-            metric={metric}
-            onMetric={setMetric}
-            day={day}
-            onDay={() => setDay(day === "today" ? "yesterday" : "today")}
-            hour={hour}
-            onReport={() => router.push("/more/area/reports/sales-over-time" as Href)}
-          />
+          traffic.loading ? <View style={{ height: 290 }} /> : traffic.data ? (
+            <TrafficPager
+              data={traffic.data}
+              hour={hour}
+              range={range}
+              onRange={setRange}
+              onLive={canLive ? () => router.push("/more/area/live" as Href) : undefined}
+            />
+          ) : traffic.error ? <AppText style={{ color: tokens.nightMuted, paddingHorizontal: 16, paddingBottom: 8 }}>{traffic.error}</AppText> : null
         ) : null}
         <View style={{ flex: 1, backgroundColor: HOME_BG, borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS, paddingHorizontal: 12, paddingTop: 22, paddingBottom: TAB_SPACE + 20, gap: 16, marginTop: 10 }}>
           <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: "100%", height: 2000, backgroundColor: HOME_BG }} />
-          <View style={{ paddingHorizontal: 6, gap: 2 }}>
-            <AppText style={{ fontSize: 26, lineHeight: 34, fontFamily: fonts.bold, color: tokens.inkStrong }}>
-              {name ? `${greeting(hour)}, ${name}` : greeting(hour)}
-            </AppText>
-            <AppText style={{ fontSize: 16, color: tokens.inkSecondary }}>הנה הפעילות שלך</AppText>
+          <View style={{ marginHorizontal: -12, marginTop: -22, marginBottom: -6, overflow: "hidden", borderTopLeftRadius: SHEET_RADIUS, borderTopRightRadius: SHEET_RADIUS }}>
+            <GreetingSky sky={hello.sky} />
+            <View style={{ alignItems: "center", paddingTop: 30, paddingBottom: 50, paddingHorizontal: 20, gap: 2 }}>
+              <AppText style={{ textAlign: "center", fontSize: 26, lineHeight: 34, fontFamily: fonts.bold, color: tokens.inkStrong }}>
+                {name ? `${hello.text}, ${name}` : hello.text}
+              </AppText>
+              <AppText style={{ textAlign: "center", fontSize: 16, color: tokens.inkSecondary }}>הנה הפעילות שלך</AppText>
+            </View>
           </View>
           {error ? <ErrorNote text={error} /> : null}
 
@@ -205,110 +290,24 @@ export default function HomeScreen() {
           ) : null}
           {!tracksTasks && !recent ? <AppText style={{ color: tokens.inkSecondary, paddingHorizontal: 6 }}>אין פעילות להצגה.</AppText> : null}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+      <Animated.View pointerEvents="none" style={[{ position: "absolute", top: 26, left: 0, right: 0, alignItems: "center" }, refreshMark]}>
+        <RefreshAsterisk />
+      </Animated.View>
       <SheetCorners />
       {accounts}
+      <AlertsSheet visible={alertsOpen} onClose={() => setAlertsOpen(false)} />
     </View>
   );
 }
 
-function TrafficPanel({
-  data,
-  loading,
-  error,
-  metric,
-  onMetric,
-  day,
-  onDay,
-  hour,
-  onReport,
-}: {
-  data: TrafficSnapshot | null;
-  loading: boolean;
-  error: string;
-  metric: Metric;
-  onMetric: (metric: Metric) => void;
-  day: "today" | "yesterday";
-  onDay: () => void;
-  hour: number;
-  onReport: () => void;
-}) {
-  const view = useMemo(() => {
-    if (!data) return null;
-    const today = data.today;
-    const yesterday = data.yesterday;
-    const salesPrev = sumTo(yesterday.salesByHour, hour);
-    const ordersPrev = sumTo(yesterday.ordersByHour, hour);
-    const visitsPrev = sumTo(yesterday.visitsByHour, hour);
-    const conversion = today.visits ? (today.orders / today.visits) * 100 : 0;
-    const conversionPrev = visitsPrev ? (ordersPrev / visitsPrev) * 100 : 0;
-    return {
-      live: data.now.visitors,
-      sales: today.sales,
-      salesDelta: delta(today.sales, salesPrev),
-      orders: today.orders,
-      ordersDelta: delta(today.orders, ordersPrev),
-      conversion,
-      conversionDelta: delta(conversion, conversionPrev),
-    };
-  }, [data, hour]);
-
-  if (loading) return <View style={{ height: 250 }} />;
-  if (!data || !view) {
-    return error ? <AppText style={{ color: tokens.nightMuted, paddingHorizontal: 16, paddingBottom: 8 }}>{error}</AppText> : null;
-  }
-
-  const source = day === "today" ? data.today : data.yesterday;
-  const series = metric === "sales" ? source.salesByHour : metric === "orders" ? source.ordersByHour : source.visitsByHour;
-  const previous = day === "today" ? (metric === "sales" ? data.yesterday.salesByHour : metric === "orders" ? data.yesterday.ordersByHour : data.yesterday.visitsByHour) : undefined;
-  const current = day === "today" ? series.slice(0, hour + 1) : series;
-
+function RefreshAsterisk() {
   return (
-    <View style={{ gap: 12 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 6 }}>
-        <MetricTile label="כעת באתר" value={formatCount(view.live)} live />
-        <MetricTile label="סך המכירות" value={formatIls(view.sales)} change={view.salesDelta} active={metric === "sales"} onPress={() => onMetric("sales")} />
-        <MetricTile label="הזמנות" value={formatCount(view.orders)} change={view.ordersDelta} active={metric === "orders"} onPress={() => onMetric("orders")} />
-        <MetricTile label="שיעור המרה" value={`${Math.round(view.conversion)}%`} change={view.conversionDelta} active={metric === "conversion"} onPress={() => onMetric("conversion")} />
-      </ScrollView>
-      <View style={{ paddingHorizontal: 12 }}>
-        <SalesChart current={current} previous={previous} label={metric === "sales" ? compactIls : compactCount} />
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "center", gap: 8 }}>
-        <NightButton icon="calendar" label={day === "today" ? "היום" : "אתמול"} onPress={onDay} />
-        <NightButton icon="report" label="צפייה בדוח" onPress={onReport} />
-      </View>
-    </View>
-  );
-}
-
-function MetricTile({ label, value, change, active = false, live = false, onPress }: { label: string; value: string; change?: number | null; active?: boolean; live?: boolean; onPress?: () => void }) {
-  const fonts = useFontSet();
-  const up = change != null && change >= 0;
-  return (
-    <Pressable disabled={!onPress} onPress={onPress} style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: active ? tokens.nightRaised : "transparent", borderWidth: 1, borderColor: active ? "#3a3a3a" : "transparent", gap: 2 }}>
-      <AppText style={{ color: "#e3e3e3", fontSize: 12 }}>{label}</AppText>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-        {live ? <Icon name="pulse" size={15} color="#36d07c" strokeWidth={1.8} /> : null}
-        <AppText style={{ color: "#ffffff", fontFamily: fonts.bold, fontSize: 17, writingDirection: "ltr" }}>{value}</AppText>
-        {change != null ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-            <Icon name="up" size={12} color={up ? "#36d07c" : "#ff6a5c"} strokeWidth={2} />
-            <AppText style={{ color: up ? "#36d07c" : "#ff6a5c", fontSize: 11, writingDirection: "ltr" }}>{`${up ? "+" : ""}${change}%`}</AppText>
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-function NightButton({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
-  const fonts = useFontSet();
-  return (
-    <Pressable onPress={onPress} style={{ height: 34, borderRadius: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: tokens.nightRaised, borderWidth: 1, borderColor: "#3a3a3a" }}>
-      <Icon name={icon} size={16} color="#ffffff" strokeWidth={1.7} />
-      <AppText style={{ color: "#ffffff", fontFamily: fonts.medium, fontSize: 14 }}>{label}</AppText>
-    </Pressable>
+    <Svg width={22} height={22} viewBox="0 0 22 22">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <Line key={deg} x1={11} y1={2.2} x2={11} y2={7.4} stroke="#ffffff" strokeWidth={2.2} strokeLinecap="round" originX={11} originY={11} rotation={deg} />
+      ))}
+    </Svg>
   );
 }
 

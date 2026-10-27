@@ -19,6 +19,7 @@ const TABS: { id: Tab; label: string }[] = [
 export default function ProductsScreen() {
   const router = useRouter();
   const allowed = useAllowed("products.read");
+  const canCreate = useAllowed("products.create");
   const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("all");
@@ -35,7 +36,12 @@ export default function ProductsScreen() {
   }, [products, query, tab, byName]);
 
   return (
-    <NightScreen sharedKey="products" title="מוצרים" options={PRODUCT_SWITCH.map((item) => ({ ...item, active: item.href === "/products" }))}>
+    <NightScreen
+      sharedKey="products"
+      title="מוצרים"
+      options={PRODUCT_SWITCH.map((item) => ({ ...item, active: item.href === "/products" }))}
+      onAdd={allowed && canCreate ? () => router.push("/products/new") : undefined}
+    >
       {loading ? <LoadingBlock /> : !allowed ? (
         <SheetEmpty icon="tag" text="אין הרשאה למסך הזה." />
       ) : (

@@ -33,11 +33,28 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Storely ניגשת לתמונות כדי להוסיף אותן למוצרים בחנות.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#fafafa",
           "image": "./assets/brand/storely-logo.png",
           "imageWidth": 76
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "color": "#1a1a1a",
+          "enableRemoteNotifications": false,
+          "sounds": ["./assets/sounds/sale.wav"]
         }
       ]
     ],

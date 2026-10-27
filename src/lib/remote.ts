@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { hebrewError } from "@/lib/errors";
+import { defaultQuizFlow, unsavedQuiz } from "@/lib/quiz-default";
+import { parsePopup, parseQuiz, popupProblem, targetingPayload, type PopupRecord, type QuizRecord } from "@/lib/popups";
 import { getSupabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 
@@ -39,7 +41,7 @@ export type TrafficSnapshot = {
   };
   today: HourlyDay & { locations: TrafficPlace[] };
   yesterday: HourlyDay;
-  days: { sales: number[]; orders: number[]; visits: number[] };
+  days: { sales: number[]; orders: number[]; visits: number[]; previousSales: number[]; previousOrders: number[]; previousVisits: number[] };
 };
 
 export type HourlyDay = {
@@ -59,13 +61,7 @@ export type CampaignRow = {
   audience: string;
 };
 
-export type PopupRow = {
-  id: string;
-  name: string;
-  status: string;
-  leads: number;
-  updatedAt: string;
-};
+export type PopupRow = PopupRecord;
 
 export type EventRow = {
   id: string;
@@ -79,6 +75,7 @@ export type EventRow = {
   address: string;
   price: number;
   status: string;
+  image: string;
 };
 
 export type UserRow = {
@@ -148,7 +145,14 @@ export function parseTraffic(value: unknown): TrafficSnapshot {
     },
     today: { ...hourly(today), locations: places(today.locations) },
     yesterday: hourly(yesterday),
-    days: { sales: series(days.sales), orders: series(days.orders), visits: series(days.visits) },
+    days: {
+      sales: series(days.sales),
+      orders: series(days.orders),
+      visits: series(days.visits),
+      previousSales: series(days.previousSales),
+      previousOrders: series(days.previousOrders),
+      previousVisits: series(days.previousVisits),
+    },
   };
 }
 
@@ -266,7 +270,7 @@ export async function loadPopups(storeId: string) {
   const supabase = await client();
   const { data, error } = await supabase
     .from("store_popups")
-    .select("id, name, status, updated_at")
+    .select("id, name, status, targeting, starts_at, ends_at, updated_at")
     .eq("store_id", storeId)
     .order("updated_at", { ascending: false });
   if (error) throw new Error(hebrewError(error));
@@ -280,23 +284,61 @@ export async function loadPopups(storeId: string) {
       counts.set(lead.popup_id, (counts.get(lead.popup_id) ?? 0) + 1);
     }
   }
-  return rows.flatMap((row): PopupRow[] => {
-    if (typeof row.id !== "string" || typeof row.name !== "string") return [];
-    return [{
-      id: row.id,
-      name: row.name,
-      status: typeof row.status === "string" ? row.status : "",
-      leads: counts.get(row.id) ?? 0,
-      updatedAt: typeof row.updated_at === "string" ? row.updated_at : "",
-    }];
+  return rows.flatMap((row) => {
+    const popup = parsePopup(row, counts.get(typeof row.id === "string" ? row.id : "") ?? 0);
+    return popup ? [popup] : [];
   });
+}
+
+export async function savePopupSettings(storeId: string, popup: PopupRow) {
+  const problem = popupProblem(popup);
+  if (problem) throw new Error(problem);
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("store_popups")
+    .update({
+      name: popup.name.trim().slice(0, 80),
+      status: popup.status,
+      targeting: targetingPayload(popup),
+      starts_at: popup.startsAt,
+      ends_at: popup.endsAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("store_id", storeId)
+    .eq("id", popup.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(hebrewError(error));
+  if (!data) throw new Error("הפופאפ לא נמצא, או שאין הרשאה לעדכן אותו.");
+}
+
+export async function loadQuiz(storeId: string): Promise<QuizRecord> {
+  const supabase = await client();
+  const { data, error } = await supabase
+    .from("store_quizzes")
+    .select("status, flow, updated_at")
+    .eq("store_id", storeId)
+    .maybeSingle();
+  if (error) throw new Error(hebrewError(error));
+  return data ? parseQuiz(data) : unsavedQuiz();
+}
+
+export async function saveQuizStatus(storeId: string, status: QuizRecord["status"], stored: boolean) {
+  const supabase = await client();
+  const updatedAt = new Date().toISOString();
+  const query = stored
+    ? supabase.from("store_quizzes").update({ status, updated_at: updatedAt }).eq("store_id", storeId)
+    : supabase.from("store_quizzes").upsert({ store_id: storeId, status, flow: defaultQuizFlow(), updated_at: updatedAt }, { onConflict: "store_id" });
+  const { data, error } = await query.select("status").maybeSingle();
+  if (error) throw new Error(hebrewError(error));
+  if (!data) throw new Error("לא הצלחנו לשמור את השאלון.");
 }
 
 export async function loadEvents(storeId: string) {
   const supabase = await client();
   const { data, error } = await supabase
     .from("store_events")
-    .select("id, title, short, body, event_date, starts_at, ends_at, online, address, price, status")
+    .select("id, title, short, body, event_date, starts_at, ends_at, online, address, price, status, image")
     .eq("store_id", storeId)
     .order("event_date", { ascending: true });
   if (error) throw new Error(hebrewError(error));
@@ -315,6 +357,7 @@ export async function loadEvents(storeId: string) {
       address: typeof row.address === "string" ? row.address : "",
       price: count(row.price),
       status: typeof row.status === "string" ? row.status : "",
+      image: typeof row.image === "string" && row.image.startsWith("https://") ? row.image : "",
     }];
   });
 }
@@ -446,6 +489,19 @@ async function saveCustomer(storeId: string, customerId: string | null, customer
   });
   if (error) throw new Error(hebrewError(error));
   return typeof data === "string" ? data : "";
+}
+
+export async function saveStoreDiscount(storeId: string, discount: Record<string, unknown>) {
+  const supabase = await client();
+  const { data, error } = await supabase.rpc("save_store_discount", { target_store: storeId, discount });
+  if (error) throw new Error(hebrewError(error));
+  return typeof data === "string" ? data : "";
+}
+
+export async function deleteStoreDiscounts(storeId: string, ids: string[]) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("delete_store_discounts", { target_store: storeId, discount_ids: ids });
+  if (error) throw new Error(hebrewError(error));
 }
 
 export async function reorderStoreCollections(storeId: string, titles: string[]) {

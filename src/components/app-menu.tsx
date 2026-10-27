@@ -226,10 +226,10 @@ export function AppMenu({ onDismiss, onNavigate }: { onDismiss: () => void; onNa
               <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#b03bd1", alignItems: "center", justifyContent: "center" }}>
                 <AppText style={{ color: "#ffffff", fontFamily: fonts.bold, fontSize: 13 }}>{initials(name || mail || title)}</AppText>
               </View>
-              <View style={{ flex: 1 }}>
-                {name ? <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold }}>{name}</AppText> : null}
-                {mail ? <AppText style={{ color: tokens.nightMuted, fontSize: 13, writingDirection: "ltr", textAlign: "right" }} numberOfLines={1}>{mail}</AppText> : null}
-                <AppText style={{ color: tokens.nightMuted, fontSize: 13 }} numberOfLines={1}>{title}</AppText>
+              <View style={{ flex: 1, alignItems: "flex-start" }}>
+                {name ? <AppText style={{ color: "#ffffff", fontFamily: fonts.semibold, maxWidth: "100%" }} numberOfLines={1}>{name}</AppText> : null}
+                {mail ? <AppText style={{ color: tokens.nightMuted, fontSize: 13, maxWidth: "100%" }} numberOfLines={1}>{mail}</AppText> : null}
+                <AppText style={{ color: tokens.nightMuted, fontSize: 13, maxWidth: "100%" }} numberOfLines={1}>{title}</AppText>
               </View>
             </View>
             {settingsItems.map((item) => (

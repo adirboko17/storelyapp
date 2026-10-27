@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Image, Linking, Modal, Pressable, ScrollView, Share, useWindowDimensions, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName } from "@/components/icon";
@@ -35,7 +35,9 @@ export default function ProductScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const allowed = useAllowed("products.read");
+  const canEdit = useAllowed("products.update");
   const { snapshot, error } = useStoreData();
   const [compact, setCompact] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -76,6 +78,7 @@ export default function ProductScreen() {
       title={compact ? product.title || "מוצר" : ""}
       actions={(
         <>
+          {canEdit ? <RoundButton icon="edit" onPress={() => router.push(`/products/edit/${product.id}` as Href)} /> : null}
           {url ? <RoundButton icon="share" onPress={() => void share()} /> : null}
           {url ? <RoundButton icon="dots" onPress={() => setMenu(true)} /> : null}
         </>
@@ -84,6 +87,7 @@ export default function ProductScreen() {
       <ScrollView
         style={{ flex: 1, backgroundColor: tokens.field }}
         contentContainerStyle={{ gap: 8, paddingBottom: TAB_SPACE + insets.bottom + 12 }}
+        nestedScrollEnabled
         scrollEventThrottle={32}
         onScroll={(event) => {
           const next = event.nativeEvent.contentOffset.y > 300;
@@ -104,9 +108,16 @@ export default function ProductScreen() {
             ) : null}
           </View>
           {media.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              directionalLockEnabled
+              showsHorizontalScrollIndicator={false}
+              style={{ width, height: tile, flexGrow: 0 }}
+              contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}
+            >
               {media.map((uri, index) => (
-                <Pressable key={uri} onPress={() => setViewer(index)}>
+                <Pressable key={`${uri}-${index}`} onPress={() => setViewer(index)}>
                   <Image source={{ uri }} style={{ width: tile, height: tile, borderRadius: 12, borderWidth: 1, borderColor: tokens.line, backgroundColor: tokens.card }} resizeMode="contain" />
                 </Pressable>
               ))}
@@ -366,15 +377,29 @@ function Pair({ label, value, strike = false, ltr = false }: { label: string; va
 }
 
 function EntryList({ items }: { items: PageEntry[] }) {
-  const fonts = useFontSet();
+  const [open, setOpen] = useState<Record<number, boolean>>({});
   return (
-    <View style={{ marginHorizontal: 16, paddingBottom: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: tokens.line }}>
-      {items.map((item, index) => (
-        <View key={`${item.title}-${index}`} style={{ gap: 2, paddingStart: 10, borderStartWidth: 2, borderStartColor: "#e3e3e3" }}>
-          <AppText style={{ fontSize: 14, fontFamily: fonts.semibold, color: tokens.inkStrong }}>{item.title}</AppText>
-          {item.body ? <AppText style={{ fontSize: 13, lineHeight: 19, color: tokens.ink }}>{item.body}</AppText> : null}
-        </View>
-      ))}
+    <View>
+      {items.map((item, index) => {
+        const expanded = Boolean(open[index] && item.body);
+        const isLast = index === items.length - 1;
+        return (
+          <View key={`${item.title}-${index}`}>
+            <Row
+              label={item.title}
+              lines={item.body ? 2 : undefined}
+              onPress={item.body ? () => setOpen((state) => ({ ...state, [index]: !state[index] })) : undefined}
+              expanded={expanded}
+              last={expanded || isLast}
+            />
+            {expanded && item.body ? (
+              <View style={{ marginHorizontal: 16, paddingBottom: 14, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: tokens.line }}>
+                <AppText style={{ fontSize: 14, lineHeight: 22, color: tokens.ink }}>{item.body}</AppText>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }

@@ -20,6 +20,7 @@ export type AreaKey =
   | "live"
   | "store"
   | "general"
+  | "notifications"
   | "ai"
   | "users"
   | "shipping"
@@ -98,6 +99,7 @@ export const MENU: MenuGroup[] = [
     title: "הגדרות",
     items: [
       { key: "general", label: "כללי", settings: true },
+      { key: "notifications", label: "התראות", settings: true },
       { key: "ai", label: "חיבור AI", settings: true },
       { key: "users", label: "משתמשים", settings: true },
       { key: "shipping", label: "משלוחים", settings: true },

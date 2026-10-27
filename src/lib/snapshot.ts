@@ -61,6 +61,8 @@ export type ProductRecord = {
   seoTitle?: string;
   seoDescription?: string;
   page?: ProductPageContent;
+  rawTags?: string[];
+  merch?: Record<string, unknown>;
 };
 
 export type ProductBundle = { qty: number; price: number; label: string; image?: string; tag?: string };
@@ -144,6 +146,7 @@ export type PostRecord = {
   blog?: string;
   visible?: boolean;
   handle?: string;
+  image?: string;
 };
 
 export type MarketingEmailRecord = {
@@ -225,6 +228,27 @@ export type DiscountRecord = {
   start?: string;
   end?: string;
   hasEnd?: boolean;
+  eligibility?: string;
+  segment?: string;
+  minType?: string;
+  minValue?: number;
+  once?: boolean;
+  limit?: boolean;
+  limitN?: number;
+  combProduct?: boolean;
+  combOrder?: boolean;
+  combShip?: boolean;
+  combBundle?: boolean;
+  blockGift?: boolean;
+  applies?: string;
+  collections?: string[];
+  bxMode?: string;
+  bxBuy?: string;
+  bxGet?: string;
+  bxColl?: string;
+  bxGetColl?: string;
+  bxBuyIds?: string[];
+  bxGetIds?: string[];
 };
 
 export type AdminSnapshot = {
@@ -398,6 +422,8 @@ function parseProduct(value: unknown): ProductRecord | null {
     seoTitle: seo ? text(seo, "title")?.trim() || undefined : undefined,
     seoDescription: seo ? text(seo, "description")?.trim() || undefined : undefined,
     page: merch ? parsePage(merch.page) : undefined,
+    rawTags,
+    merch: merch ?? undefined,
     id,
     title: text(row, "title"),
     status: text(row, "status"),
@@ -465,6 +491,27 @@ function parseDiscount(value: unknown): DiscountRecord | null {
     start: text(row, "start"),
     end: text(row, "end"),
     hasEnd: flag(row, "hasEnd"),
+    eligibility: text(row, "eligibility"),
+    segment: text(row, "segment"),
+    minType: text(row, "minType"),
+    minValue: num(row, "minValue"),
+    once: flag(row, "once"),
+    limit: flag(row, "limit"),
+    limitN: num(row, "limitN"),
+    combProduct: flag(row, "combProduct"),
+    combOrder: flag(row, "combOrder"),
+    combShip: flag(row, "combShip"),
+    combBundle: flag(row, "combBundle"),
+    blockGift: flag(row, "blockGift"),
+    applies: text(row, "applies"),
+    collections: strings(row, "collections"),
+    bxMode: text(row, "bxMode"),
+    bxBuy: text(row, "bxBuy"),
+    bxGet: text(row, "bxGet"),
+    bxColl: text(row, "bxColl"),
+    bxGetColl: text(row, "bxGetColl"),
+    bxBuyIds: strings(row, "bxBuyIds"),
+    bxGetIds: strings(row, "bxGetIds"),
   };
 }
 
@@ -561,6 +608,7 @@ function parsePost(value: unknown, index: number): PostRecord | null {
     blog: text(row, "blog"),
     visible: flag(row, "visible"),
     handle: text(row, "handle"),
+    image: text(row, "image"),
   };
 }
 

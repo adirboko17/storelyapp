@@ -3,6 +3,7 @@ import { Redirect, Tabs } from "expo-router";
 import { AnimatedTabsContainer, MenuOverlay, MenuProvider } from "@/components/menu-motion";
 import { FloatingTabBar } from "@/components/tab-bar";
 import { HeaderProvider, SharedTabsHeader } from "@/components/tab-header";
+import { AlertWatcher } from "@/lib/sale-alerts";
 import { useAllowed, StoreDataProvider } from "@/lib/store-data";
 import { useSession } from "@/lib/session";
 import { tokens } from "@/theme/tokens";
@@ -17,6 +18,7 @@ export default function AppLayout() {
   }
   return (
     <StoreDataProvider>
+      <AlertWatcher />
       <AppTabs />
     </StoreDataProvider>
   );

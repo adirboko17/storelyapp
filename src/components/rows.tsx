@@ -26,11 +26,12 @@ export const CUSTOMER_SWITCH = [
   { label: "פלחים", href: "/more/area/segments" },
 ];
 
-export function OrderRow({ order, onPress }: { order: OrderRecord; onPress: () => void }) {
+export function OrderRow({ order, onPress, refund = false }: { order: OrderRecord; onPress: () => void; refund?: boolean }) {
   const fonts = useFontSet();
-  const closed = Boolean(order.fulfillment) && !isOpenOrder(order);
+  const closed = !refund && Boolean(order.fulfillment) && !isOpenOrder(order);
   const fulfillment = knownBadge(FULFILLMENT_BADGE, order.fulfillment);
   const pay = knownBadge(PAY_BADGE, order.pay);
+  const amount = refund && order.refunded != null ? order.refunded : order.total;
   const items = itemCount(order);
   const meta = [
     order.customerName,
@@ -42,7 +43,7 @@ export function OrderRow({ order, onPress }: { order: OrderRecord; onPress: () =
       <View style={{ gap: 4, opacity: closed ? 0.62 : 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong }}>#{order.number}</AppText>
-          {order.total != null ? <AppText style={{ fontSize: 15, color: tokens.inkStrong, writingDirection: "ltr" }}>{formatIls(order.total)}</AppText> : null}
+          {amount != null ? <AppText style={{ fontSize: 15, color: tokens.inkStrong, writingDirection: "ltr" }}>{formatIls(amount)}</AppText> : null}
         </View>
         {meta ? <AppText style={{ color: tokens.inkSecondary, fontSize: 14 }} numberOfLines={1}>{meta}</AppText> : null}
         <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
