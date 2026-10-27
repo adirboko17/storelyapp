@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
-import { SectionList } from "react-native";
+import { Alert, SectionList } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ORDER_SWITCH, OrderRow } from "@/components/rows";
 import { Chips, NightScreen, SearchBar, SectionLabel, SheetEmpty } from "@/components/shell";
 import { ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
 import { hebrewDay } from "@/lib/format";
+import { deleteStoreOrder } from "@/lib/remote";
+import { useSession } from "@/lib/session";
 import { isOpenOrder, sortedOrders, type OrderRecord } from "@/lib/snapshot";
 import { useAllowed, useStoreData } from "@/lib/store-data";
 import { TAB_SPACE } from "@/theme/tokens";
@@ -30,11 +33,13 @@ function inTab(order: OrderRecord, tab: Tab) {
 export default function OrdersScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const router = useRouter();
+  const { storeId } = useSession();
   const allowed = useAllowed("orders.read");
   const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>(() => TABS.find((item) => item.id === params.tab)?.id ?? "all");
   const [oldest, setOldest] = useState(false);
+  const [problem, setProblem] = useState("");
   const [seenTab, setSeenTab] = useState(params.tab);
   if (params.tab !== seenTab) {
     setSeenTab(params.tab);
@@ -61,6 +66,32 @@ export default function OrdersScreen() {
     return groups;
   }, [orders, query, tab, oldest]);
 
+  function askDelete(order: OrderRecord) {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    Alert.alert("למחוק את ההזמנה?", `#${order.number}\nאי אפשר לשחזר אותה.`, [
+      { text: "ביטול", style: "cancel" },
+      { text: "מחיקה", style: "destructive", onPress: () => void remove(order) },
+    ]);
+  }
+
+  async function remove(order: OrderRecord) {
+    if (!storeId) {
+      setProblem("אין חנות נבחרת.");
+      return;
+    }
+    if (!order.id) {
+      setProblem("ההזמנה לא נמצאה.");
+      return;
+    }
+    setProblem("");
+    try {
+      await deleteStoreOrder(storeId, order.id);
+      await refresh();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "לא הצלחנו למחוק את ההזמנה.");
+    }
+  }
+
   return (
     <NightScreen sharedKey="orders" title="הזמנות" options={ORDER_SWITCH.map((item) => ({ ...item, active: item.href === "/orders" }))}>
       {loading ? <LoadingBlock /> : !allowed ? (
@@ -70,6 +101,7 @@ export default function OrdersScreen() {
           <SearchBar value={query} onChange={setQuery} placeholder="חיפוש" onSort={() => setOldest(!oldest)} sortActive={oldest} />
           <Chips items={TABS} value={tab} onChange={setTab} />
           {error ? <ErrorNote text={error} /> : null}
+          {problem ? <ErrorNote text={problem} /> : null}
           <SectionList
             style={{ flex: 1 }}
             sections={sections}
@@ -82,7 +114,7 @@ export default function OrdersScreen() {
             refreshControl={refreshControl(refreshing, () => void refresh())}
             keyboardShouldPersistTaps="handled"
             renderSectionHeader={({ section }) => <SectionLabel text={section.title} />}
-            renderItem={({ item }) => <OrderRow order={item} onPress={() => router.push(`/orders/${item.number}`)} />}
+            renderItem={({ item }) => <OrderRow order={item} onPress={() => router.push(`/orders/${item.number}`)} onLongPress={() => askDelete(item)} />}
             ListEmptyComponent={error ? undefined : (
               <SheetEmpty
                 icon="orders"

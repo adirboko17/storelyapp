@@ -1,4 +1,5 @@
-import { View } from "react-native";
+import { useState } from "react";
+import { View, type TextLayoutEvent } from "react-native";
 import { FlatRow, Thumb } from "@/components/shell";
 import { AppText, Badge } from "@/components/ui";
 import { formatCount, formatIls, hebrewTime } from "@/lib/format";
@@ -26,7 +27,7 @@ export const CUSTOMER_SWITCH = [
   { label: "פלחים", href: "/more/area/segments" },
 ];
 
-export function OrderRow({ order, onPress, refund = false }: { order: OrderRecord; onPress: () => void; refund?: boolean }) {
+export function OrderRow({ order, onPress, onLongPress, refund = false }: { order: OrderRecord; onPress: () => void; onLongPress?: () => void; refund?: boolean }) {
   const fonts = useFontSet();
   const closed = !refund && Boolean(order.fulfillment) && !isOpenOrder(order);
   const fulfillment = knownBadge(FULFILLMENT_BADGE, order.fulfillment);
@@ -39,7 +40,7 @@ export function OrderRow({ order, onPress, refund = false }: { order: OrderRecor
     hebrewTime(order.createdAt),
   ].filter(Boolean).join(" • ");
   return (
-    <FlatRow onPress={onPress}>
+    <FlatRow onPress={onPress} onLongPress={onLongPress}>
       <View style={{ gap: 4, opacity: closed ? 0.62 : 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong }}>#{order.number}</AppText>
@@ -60,16 +61,37 @@ export function OrderRow({ order, onPress, refund = false }: { order: OrderRecor
   );
 }
 
-export function ProductRow({ product, onPress }: { product: ProductRecord; onPress: () => void }) {
+function ProductName({ title }: { title: string }) {
   const fonts = useFontSet();
+  const [rest, setRest] = useState<string | null>(null);
+  const first = rest == null ? title : title.slice(0, title.length - rest.length).trimEnd();
+  function measure(event: TextLayoutEvent) {
+    const lines = event.nativeEvent.lines;
+    const opening = lines[0]?.text ?? "";
+    if (lines.length <= 1 || !opening || !title.startsWith(opening)) {
+      setRest("");
+      return;
+    }
+    setRest(title.slice(opening.length).trim());
+  }
+  return (
+    <View>
+      <AppText style={{ fontFamily: fonts.bold, fontSize: 15, lineHeight: 20, color: tokens.inkStrong }} onTextLayout={rest == null ? measure : undefined}>{first}</AppText>
+      {rest ? <AppText style={{ fontFamily: fonts.semibold, fontSize: 14, lineHeight: 19, color: tokens.inkStrong }}>{rest}</AppText> : null}
+    </View>
+  );
+}
+
+export function ProductRow({ product, onPress, onLongPress }: { product: ProductRecord; onPress: () => void; onLongPress?: () => void }) {
   const badge = knownBadge(PRODUCT_BADGE, product.status);
   const empty = product.stock != null && product.stock <= 0;
+  const title = product.title?.trim() || "ללא שם";
   return (
-    <FlatRow onPress={onPress}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+    <FlatRow onPress={onPress} onLongPress={onLongPress}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         <Thumb uri={product.media?.[0]} />
         <View style={{ flex: 1, gap: 3 }}>
-          <AppText style={{ fontFamily: fonts.bold, fontSize: 15, color: tokens.inkStrong }} numberOfLines={2}>{product.title || "ללא שם"}</AppText>
+          <ProductName key={title} title={title} />
           {product.stock != null ? (
             <AppText style={{ fontSize: 13, color: empty ? tokens.negative : tokens.inkSecondary }}>{`${formatCount(Math.max(0, product.stock))} במלאי`}</AppText>
           ) : product.variant ? <AppText style={{ fontSize: 13, color: tokens.inkSecondary }}>{product.variant}</AppText> : null}
@@ -80,13 +102,13 @@ export function ProductRow({ product, onPress }: { product: ProductRecord; onPre
   );
 }
 
-export function CustomerRow({ person, spent, onPress }: { person: CustomerRecord; spent?: number; onPress: () => void }) {
+export function CustomerRow({ person, spent, onPress, onLongPress }: { person: CustomerRecord; spent?: number; onPress: () => void; onLongPress?: () => void }) {
   const fonts = useFontSet();
   const place = [person.city, "ישראל"].filter(Boolean).join(", ");
   const orders = person.orders != null ? (person.orders === 1 ? "הזמנה אחת" : `${formatCount(person.orders)} הזמנות`) : "";
   const meta = [spent != null ? formatIls(spent) : "", orders].filter(Boolean).join(" • ");
   return (
-    <FlatRow onPress={onPress}>
+    <FlatRow onPress={onPress} onLongPress={onLongPress}>
       <View style={{ gap: 3 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <AppText style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16, color: tokens.inkStrong }} numberOfLines={1}>{person.name || person.email || "ללא שם"}</AppText>

@@ -171,11 +171,18 @@ export type FlowRecord = {
   steps?: string[];
 };
 
+export type ConnectedIntegration = {
+  key: string;
+  label: string;
+};
+
 export type MarketingRecord = {
   emails?: MarketingEmailRecord[];
   sms?: MarketingSmsRecord[];
   flows?: FlowRecord[];
-  connected?: string[];
+  connected?: ConnectedIntegration[];
+  usedEmailIds?: string[];
+  usedSmsIds?: string[];
 };
 
 export type ShipRuleRecord = {
@@ -185,18 +192,41 @@ export type ShipRuleRecord = {
   fee?: string;
 };
 
+export type ShipRateRecord = {
+  id: string;
+  name: string;
+  price: string;
+};
+
+export type ShipZoneRecord = {
+  id: string;
+  name: string;
+  country: string;
+  rates: ShipRateRecord[];
+};
+
+export type ShipLocationRecord = {
+  name: string;
+  address: string;
+};
+
 export type ShipProfileRecord = {
   id: string;
   name?: string;
+  location?: ShipLocationRecord | null;
+  zones?: ShipZoneRecord[];
 };
 
 export type StoreContact = {
   email?: string;
   phone?: string;
+  addressMode?: "none" | "physical";
   company?: string;
+  country?: string;
   street?: string;
-  city?: string;
+  apartment?: string;
   zip?: string;
+  city?: string;
 };
 
 export type ShippingRecord = {
@@ -213,6 +243,9 @@ export type PolicyRecord = {
   title: string;
   body?: string;
   kind?: string;
+  footer?: boolean;
+  cart?: string;
+  checkout?: string;
 };
 
 export type DiscountRecord = {
@@ -668,6 +701,29 @@ function parseFlow(value: unknown): FlowRecord | null {
   return { id: rawId, name, trigger: text(row, "trigger"), on: flag(row, "on"), steps: owns(row, "steps") ? steps : undefined };
 }
 
+function walkSteps(value: unknown, visit: (row: Record<string, unknown>) => void) {
+  if (!Array.isArray(value)) return;
+  for (const entry of value) {
+    const row = record(entry);
+    if (!row) continue;
+    visit(row);
+    walkSteps(row.yes, visit);
+    walkSteps(row.no, visit);
+    walkSteps(row.a, visit);
+    walkSteps(row.b, visit);
+    walkSteps(row.mail, visit);
+    walkSteps(row.phone, visit);
+  }
+}
+
+function connectedLabel(key: string, item: Record<string, unknown>) {
+  if (key === "code") {
+    const count = (text(item, "head") ?? "").length + (text(item, "body") ?? "").length;
+    return count ? `${count} תווים` : "מחובר";
+  }
+  return text(item, "id") || "מחובר";
+}
+
 function parseMarketing(value: unknown): MarketingRecord | undefined {
   const row = record(value);
   if (!row) return undefined;
@@ -677,12 +733,30 @@ function parseMarketing(value: unknown): MarketingRecord | undefined {
   if (owns(row, "flows")) marketing.flows = list(row.flows, parseFlow) ?? [];
   if (owns(row, "connected")) {
     const connected = record(row.connected);
-    marketing.connected = connected ? Object.keys(connected).filter((key) => {
+    marketing.connected = connected ? Object.keys(connected).flatMap((key) => {
       const item = record(connected[key]);
-      if (!item) return false;
-      return Boolean(text(item, "id") || text(item, "token") || text(item, "head") || text(item, "body"));
+      if (!item) return [];
+      if (!text(item, "id") && !text(item, "token") && !text(item, "head") && !text(item, "body")) return [];
+      return [{ key, label: connectedLabel(key, item) }];
     }) : [];
   }
+  const usedEmails = new Set<string>();
+  const usedSms = new Set<string>();
+  if (Array.isArray(row.flows)) {
+    for (const flow of row.flows) {
+      const item = record(flow);
+      if (!item) continue;
+      walkSteps(item.steps, (step) => {
+        const kind = text(step, "type");
+        const emailId = text(step, "emailId");
+        const smsId = text(step, "smsId");
+        if (kind === "email" && emailId) usedEmails.add(emailId);
+        if (kind === "sms" && smsId) usedSms.add(smsId);
+      });
+    }
+  }
+  marketing.usedEmailIds = [...usedEmails];
+  marketing.usedSmsIds = [...usedSms];
   return marketing;
 }
 
@@ -703,7 +777,28 @@ function parseShipping(value: unknown): ShippingRecord | undefined {
       const item = record(entry);
       const id = item ? text(item, "id") : undefined;
       if (!item || !id) return null;
-      return { id, name: text(item, "name") };
+      const location = record(item.location);
+      return {
+        id,
+        name: text(item, "name"),
+        location: location ? { name: text(location, "name") ?? "", address: text(location, "address") ?? "" } : null,
+        zones: list(item.zones, (zoneEntry) => {
+          const zone = record(zoneEntry);
+          const zoneId = zone ? text(zone, "id") : undefined;
+          if (!zone || !zoneId) return null;
+          return {
+            id: zoneId,
+            name: text(zone, "name") ?? "",
+            country: text(zone, "country") ?? "",
+            rates: list(zone.rates, (rateEntry) => {
+              const rate = record(rateEntry);
+              const rateId = rate ? text(rate, "id") : undefined;
+              if (!rate || !rateId) return null;
+              return { id: rateId, name: text(rate, "name") ?? "", price: text(rate, "price") ?? "" };
+            }) ?? [],
+          };
+        }) ?? [],
+      };
     }) ?? [];
   }
   if (owns(row, "estimates")) shipping.estimates = flag(row, "estimates");
@@ -712,13 +807,19 @@ function parseShipping(value: unknown): ShippingRecord | undefined {
   if (owns(row, "contact")) {
     const contact = record(row.contact);
     if (contact) {
+      const mode = text(contact, "addressMode");
+      const street = text(contact, "street");
+      const city = text(contact, "city");
       shipping.contact = {
         email: text(contact, "email"),
         phone: text(contact, "phone"),
+        addressMode: mode === "physical" || mode === "none" ? mode : street || city ? "physical" : "none",
         company: text(contact, "company"),
-        street: text(contact, "street"),
-        city: text(contact, "city"),
+        country: text(contact, "country"),
+        street,
+        apartment: text(contact, "apartment"),
         zip: text(contact, "zip"),
+        city,
       };
     }
   }
@@ -734,7 +835,17 @@ function parsePolicies(value: unknown): PolicyRecord[] | undefined {
       const id = item ? text(item, "id") : undefined;
       const title = item ? text(item, "title") : undefined;
       if (!item || !id || !title) return [];
-      return [{ id, title, body: text(item, "body"), kind: text(item, "kind") }];
+      const cart = text(item, "cart");
+      const checkout = text(item, "checkout");
+      return [{
+        id,
+        title,
+        body: text(item, "body"),
+        kind: text(item, "kind"),
+        footer: typeof item.footer === "boolean" ? item.footer : undefined,
+        cart: cart === "hidden" || cart === "link" || cart === "checkbox" ? cart : undefined,
+        checkout: checkout === "hidden" || checkout === "link" || checkout === "checkbox" ? checkout : undefined,
+      }];
     });
   }
   return Object.entries(row).flatMap(([key, entry]) => {

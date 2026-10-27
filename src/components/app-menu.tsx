@@ -29,7 +29,7 @@ const NAV: NavItem[] = [
   { key: "products", label: "מוצרים", icon: "tag", href: "/products", permission: "products.read", children: [{ label: "מוצרים", href: "/products", permission: "products.read" }, area("collections"), area("inventory"), area("reviews"), area("gift-cards")] },
   { key: "customers", label: "לקוחות", icon: "user", href: "/customers", permission: "customers.read", children: [{ label: "לקוחות", href: "/customers", permission: "customers.read" }, area("segments")] },
   { key: "growth", label: "צמיחה", icon: "growth", href: "/more/area/growth", permission: "analytics.read", children: [area("growth"), area("attribution")] },
-  { key: "marketing", label: "שיווק", icon: "megaphone", href: "/more/area/integrations", permission: "marketing.read", children: [area("integrations"), area("messages"), area("automations"), area("campaigns"), area("popups")] },
+  { key: "marketing", label: "שיווק", icon: "megaphone", href: "/more/area/integrations", permission: "marketing.read", children: [area("integrations"), area("messages"), area("automations"), area("popups")] },
   { key: "discounts", label: "הנחות", icon: "discount", href: "/more/discounts", permission: "discounts.read" },
   { key: "content", label: "תוכן", icon: "content", href: "/more/area/posts", permission: "content.read", children: [area("posts"), area("events")] },
   { key: "analytics", label: "ניתוח נתונים", icon: "bars", href: "/more/area/analytics", children: [area("analytics"), area("reports"), area("live")] },
@@ -150,13 +150,13 @@ export function AppMenu({ onDismiss, onNavigate }: { onDismiss: () => void; onNa
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const title = useStoreTitle();
-  const { email, memberships, storeId, signOut } = useSession();
+  const { email, memberships, storeId, menuName, signOut } = useSession();
   const { access, snapshot } = useStoreData();
   const [open, setOpen] = useState<string>("");
   const [settings, setSettings] = useState(false);
   const blurTarget = useRef<ComponentRef<typeof View> | null>(null);
   const member = memberships.find((item) => item.storeId === storeId);
-  const name = access?.name?.trim() || member?.memberName || "";
+  const name = menuName || access?.name?.trim() || member?.memberName || "";
   const mail = access?.email?.trim() || email;
   const host = snapshot?.hostname?.trim();
   const storeUrl = host ? (host.startsWith("http") ? host : `https://${host}`) : "";

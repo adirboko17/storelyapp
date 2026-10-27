@@ -31,6 +31,7 @@ export function BrowseList<T>({
   onRefresh,
   keyExtractor,
   onPress,
+  onLongPress,
   renderItem,
   header,
 }: {
@@ -45,6 +46,7 @@ export function BrowseList<T>({
   onRefresh?: () => void;
   keyExtractor: (item: T) => string;
   onPress?: (item: T) => void;
+  onLongPress?: (item: T) => void;
   renderItem: (item: T) => ReactNode;
   header?: ReactNode;
 }) {
@@ -61,7 +63,7 @@ export function BrowseList<T>({
         refreshControl={onRefresh ? refreshControl(Boolean(refreshing), onRefresh) : undefined}
         ListHeaderComponent={header ? <View style={{ paddingVertical: 8 }}>{header}</View> : undefined}
         ListEmptyComponent={error ? undefined : <SheetEmpty text={query?.trim() ? "אין תוצאות לחיפוש" : empty} />}
-        renderItem={({ item }) => <FlatRow onPress={onPress ? () => onPress(item) : undefined}>{renderItem(item)}</FlatRow>}
+        renderItem={({ item }) => <FlatRow onPress={onPress ? () => onPress(item) : undefined} onLongPress={onLongPress ? () => onLongPress(item) : undefined}>{renderItem(item)}</FlatRow>}
       />
     </View>
   );

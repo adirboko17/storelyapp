@@ -24,7 +24,7 @@ import {
   type PopupStatus,
   type PopupTrigger,
 } from "@/lib/popups";
-import { loadPopups, loadQuiz, savePopupSettings, saveQuizStatus, useStoreCall } from "@/lib/remote";
+import { loadPopups, loadQuiz, savePopupSettings, useStoreCall } from "@/lib/remote";
 import { useSession } from "@/lib/session";
 import { useStoreData } from "@/lib/store-data";
 import { useFontSet } from "@/theme/fonts";
@@ -158,9 +158,14 @@ export function PopupsHome() {
         contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: TAB_SPACE + 28 }}
       >
         {popups.error ? <ErrorNote text={popups.error} /> : null}
+        <SectionTitle text="פופאפים" />
         {rows.length === 0 && !popups.error ? (
-          <View style={{ paddingVertical: 18, alignItems: "center" }}>
-            <AppText style={{ color: tokens.inkSecondary, textAlign: "center" }}>אין פופאפים עדיין</AppText>
+          <View style={{ backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: LINE, paddingHorizontal: 24, paddingVertical: 28, alignItems: "center", gap: 8 }}>
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#f3f3f3", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>
+              <Icon name="layers" size={24} color={tokens.inkStrong} strokeWidth={1.6} />
+            </View>
+            <AppText style={{ fontFamily: fonts.bold, fontSize: 17, color: tokens.inkStrong, textAlign: "center" }}>אין פופאפים עדיין</AppText>
+            <AppText style={{ color: tokens.inkSecondary, fontSize: 14, lineHeight: 20, textAlign: "center" }}>חלון שקופץ למבקרים באתר. פופאפ חדש מוסיפים בעורך של האתר, עם הכפתור + למעלה.</AppText>
           </View>
         ) : rows.map((item) => (
           <Pressable
@@ -197,9 +202,9 @@ export function PopupsHome() {
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Pill status={quizRow.status === "active" ? "active" : "draft"} label={quizRow.status === "active" ? "פעיל" : "טיוטה"} />
-              <AppText style={{ color: tokens.inkSecondary, fontSize: 13 }}>{`${quizRow.questions.length} שאלות`}</AppText>
+              <AppText style={{ color: tokens.inkSecondary, fontSize: 13 }}>{`${quizRow.flow.questions.length} שאלות`}</AppText>
             </View>
-            {quizRow.introTitle.trim() ? <AppText style={{ color: MUTED, fontSize: 13 }} numberOfLines={1}>{quizRow.introTitle.split("\n")[0]}</AppText> : null}
+            {quizRow.flow.introTitle.trim() ? <AppText style={{ color: MUTED, fontSize: 13 }} numberOfLines={1}>{quizRow.flow.introTitle.split("\n")[0]}</AppText> : null}
           </Pressable>
         ) : null}
       </ScrollView>
@@ -474,83 +479,3 @@ export function PopupEditor({ id }: { id: string }) {
 }
 
 const dateField = { height: 42, borderRadius: 10, borderWidth: 1, borderColor: "#e3e3e3", paddingHorizontal: 12, fontSize: 15, color: tokens.inkStrong, textAlign: "left" as const, writingDirection: "ltr" as const };
-
-export function QuizScreen() {
-  const fonts = useFontSet();
-  const { storeId } = useSession();
-  const remote = useStoreCall(loadQuiz);
-  const quiz = remote.data;
-  const [status, setStatus] = useState<"draft" | "active" | "">("");
-  const [seen, setSeen] = useState("");
-  const [problem, setProblem] = useState("");
-  const [saved, setSaved] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const mark = quiz ? `${quiz.stored}:${quiz.status}:${quiz.updatedAt ?? ""}` : "";
-  if (quiz && mark !== seen) {
-    setStatus(quiz.status);
-    setSeen(mark);
-  }
-
-  async function save() {
-    if (!quiz || !storeId || !status || busy) return;
-    setBusy(true);
-    setProblem("");
-    setSaved("");
-    try {
-      await saveQuizStatus(storeId, status, quiz.stored);
-      setSaved("נשמר");
-      await remote.sync();
-    } catch (caught) {
-      setProblem(caught instanceof Error ? caught.message : "לא הצלחנו לשמור את השאלון.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <DetailScreen title="שאלון 5% הנחה" scroll={false}>
-      {remote.loading && !quiz ? <LoadingBlock /> : remote.error && !quiz ? <ErrorNote text={remote.error} /> : !quiz ? (
-        <SheetEmpty text="השאלון לא נמצא." />
-      ) : (
-        <ScrollView style={{ flex: 1, backgroundColor: PAGE }} contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: TAB_SPACE + 28 }}>
-          <Card>
-            <AppText style={{ color: MUTED, fontSize: 13, lineHeight: 18 }}>עריכת השאלות והתשובות נעשית בעורך של האתר. כאן אפשר להפעיל את השאלון או להחזיר אותו לטיוטה.</AppText>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {(["active", "draft"] as const).map((item) => {
-                const on = status === item;
-                return (
-                  <Pressable key={item} onPress={() => { setStatus(item); setProblem(""); setSaved(""); }} style={{ flex: 1, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: on ? tokens.inkStrong : PAGE }}>
-                    <AppText style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? "#ffffff" : tokens.inkStrong }}>{item === "active" ? "פעיל" : "טיוטה"}</AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </Card>
-          {quiz.introTitle.trim() || quiz.introText.trim() ? (
-            <Card>
-              {quiz.introTitle.trim() ? <AppText style={{ fontFamily: fonts.bold, fontSize: 18, color: tokens.inkStrong, lineHeight: 26 }}>{quiz.introTitle}</AppText> : null}
-              {quiz.introText.trim() ? <AppText style={{ fontSize: 14, lineHeight: 20, color: tokens.inkSoft }}>{quiz.introText}</AppText> : null}
-            </Card>
-          ) : null}
-          <SectionTitle text={`${quiz.questions.length} שאלות`} />
-          {quiz.questions.map((question, index) => (
-            <Card key={question.id}>
-              <AppText style={{ fontFamily: fonts.semibold, fontSize: 15, color: tokens.inkStrong, lineHeight: 22 }}>{`${index + 1}. ${question.title.trim() || "שאלה בלי כותרת"}`}</AppText>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {question.choices.map((choice) => (
-                  <View key={choice.id} style={{ borderRadius: 999, backgroundColor: PAGE, paddingHorizontal: 12, paddingVertical: 6 }}>
-                    <AppText style={{ fontSize: 13, color: tokens.inkStrong }}>{choice.label.trim() || "תשובה"}</AppText>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          ))}
-          {problem ? <AppText style={{ color: tokens.negative, fontSize: 13 }}>{problem}</AppText> : null}
-          {saved ? <AppText style={{ color: tokens.positive, fontSize: 13 }}>{saved}</AppText> : null}
-          <PrimaryButton label={busy ? "שומרים..." : "שמירה"} disabled={busy || status === quiz.status} onPress={() => void save()} />
-        </ScrollView>
-      )}
-    </DetailScreen>
-  );
-}

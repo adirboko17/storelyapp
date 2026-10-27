@@ -1,4 +1,4 @@
-import type { QuizRecord } from "@/lib/popups";
+import type { QuizFlow } from "@/lib/quiz";
 
 const FORM = "form";
 
@@ -35,7 +35,7 @@ function question(id: string, title: string, choices: ReturnType<typeof choice>[
 }
 
 /** The homepage quiz the website editor opens before a row is stored. */
-export function defaultQuizFlow() {
+export function defaultQuizFlow(): QuizFlow {
   return {
     introEyebrow: "מתנת הצטרפות",
     introTitle: "ענו על 3 שאלות\nוקבלו 5% הנחה",
@@ -108,18 +108,3 @@ export function defaultQuizFlow() {
   };
 }
 
-export function unsavedQuiz(): QuizRecord {
-  const flow = defaultQuizFlow();
-  return {
-    stored: false,
-    status: "draft",
-    updatedAt: null,
-    introTitle: flow.introTitle,
-    introText: flow.introText,
-    questions: flow.questions.map((item) => ({
-      id: item.id,
-      title: item.title,
-      choices: item.choices.map((option) => ({ id: option.id, label: option.label })),
-    })),
-  };
-}

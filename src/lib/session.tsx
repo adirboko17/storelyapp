@@ -27,8 +27,10 @@ type SessionValue = {
   storeName: string;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  menuName: string;
   selectStore: (storeId: string) => Promise<void>;
-  refreshMemberships: () => Promise<void>;
+  refreshMemberships: (quiet?: boolean) => Promise<void>;
+  setMenuName: (name: string) => void;
 };
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -70,6 +72,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [storeName, setStoreName] = useState("");
+  const [menuName, setMenuNameState] = useState("");
   const request = useRef(0);
   const userIdRef = useRef<string | null>(null);
   const phaseRef = useRef(phase);
@@ -158,6 +161,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!user) {
           setUserId(null);
           setEmail("");
+          setMenuNameState("");
           setMemberships([]);
           setStoreId(null);
           setStoreName("");
@@ -166,6 +170,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         setUserId(user.id);
         setEmail(user.email ?? "");
+        const savedName = user.user_metadata?.menu_name;
+        setMenuNameState(typeof savedName === "string" ? savedName.trim() : "");
         if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
         void loadMemberships(user.id, false);
       }, 0);
@@ -190,6 +196,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     memberships,
     storeId,
     storeName,
+    menuName,
     async signIn(nextEmail: string, password: string) {
       const problem = publicConfigProblem();
       if (problem) return problem;
@@ -208,6 +215,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMemberships([]);
       setStoreId(null);
       setStoreName("");
+      setMenuNameState("");
       setPhase(publicConfigProblem() ? "unconfigured" : "signed-out");
     },
     async selectStore(nextStoreId: string) {
@@ -218,10 +226,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setStoreName(membership.displayName);
       setPhase("ready");
     },
-    async refreshMemberships() {
-      if (userId) await loadMemberships(userId, false);
+    async refreshMemberships(quiet = false) {
+      if (userId) await loadMemberships(userId, quiet);
     },
-  }), [phase, error, email, userId, memberships, storeId, storeName]);
+    setMenuName(name: string) {
+      setMenuNameState(name.trim());
+    },
+  }), [phase, error, email, userId, memberships, storeId, storeName, menuName]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

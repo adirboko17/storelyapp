@@ -29,18 +29,6 @@ export type PopupRecord = {
   endsAt: string | null;
 };
 
-export type QuizChoiceView = { id: string; label: string };
-export type QuizQuestionView = { id: string; title: string; choices: QuizChoiceView[] };
-
-export type QuizRecord = {
-  stored: boolean;
-  status: "draft" | "active";
-  updatedAt: string | null;
-  introTitle: string;
-  introText: string;
-  questions: QuizQuestionView[];
-};
-
 export const BASIC_PATHS = ["/events", "/contact", "/stores", "/podcast"] as const;
 
 export const PAGE_CHOICES: { id: string; label: string; hint: string; flag?: keyof Pick<PopupPages, "home" | "product" | "catalog" | "checkout" | "content">; path?: string }[] = [
@@ -222,42 +210,6 @@ export function parseLocalDate(value: string) {
   const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4] ?? "00"}:${match[5] ?? "00"}`);
   if (Number.isNaN(date.getTime())) throw new Error("התאריך לא תקין");
   return date.toISOString();
-}
-
-export function parseQuiz(row: { status?: unknown; flow?: unknown; updated_at?: unknown } | null): QuizRecord {
-  if (!row) return { stored: false, status: "draft", updatedAt: null, introTitle: "", introText: "", questions: [] };
-  const flow = row.flow && typeof row.flow === "object" ? row.flow as Record<string, unknown> : {};
-  const questions: QuizQuestionView[] = [];
-  if (Array.isArray(flow.questions)) {
-    for (const item of flow.questions) {
-      if (!item || typeof item !== "object") continue;
-      const record = item as Record<string, unknown>;
-      const title = typeof record.title === "string" ? record.title : "";
-      const id = typeof record.id === "string" && record.id ? record.id : title;
-      const choices: QuizChoiceView[] = [];
-      if (Array.isArray(record.choices)) {
-        for (const choice of record.choices) {
-          if (!choice || typeof choice !== "object") continue;
-          const next = choice as Record<string, unknown>;
-          const label = typeof next.label === "string" ? next.label : "";
-          const choiceId = typeof next.id === "string" && next.id ? next.id : label;
-          if (!choiceId && !label) continue;
-          choices.push({ id: choiceId || label, label });
-        }
-      }
-      if (!id && !title) continue;
-      questions.push({ id: id || `q${questions.length + 1}`, title, choices });
-      if (questions.length >= 40) break;
-    }
-  }
-  return {
-    stored: true,
-    status: row.status === "active" ? "active" : "draft",
-    updatedAt: typeof row.updated_at === "string" ? row.updated_at : null,
-    introTitle: typeof flow.introTitle === "string" ? flow.introTitle : "",
-    introText: typeof flow.introText === "string" ? flow.introText : "",
-    questions,
-  };
 }
 
 export function copyPopup(popup: PopupRecord): PopupRecord {

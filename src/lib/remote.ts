@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { hebrewError } from "@/lib/errors";
-import { defaultQuizFlow, unsavedQuiz } from "@/lib/quiz-default";
-import { parsePopup, parseQuiz, popupProblem, targetingPayload, type PopupRecord, type QuizRecord } from "@/lib/popups";
+import { quizFromRow, quizProblem, unsavedQuiz, type QuizRecord } from "@/lib/quiz";
+import { parsePopup, popupProblem, targetingPayload, type PopupRecord } from "@/lib/popups";
 import { getSupabase } from "@/lib/supabase";
 import { useSession } from "@/lib/session";
 
@@ -22,6 +22,9 @@ export type ChannelRow = {
   visits: number;
   orders: number;
   sales: number;
+  fresh: number;
+  returning: number;
+  days: number[];
 };
 
 export type TrafficPlace = { label: string; count: number };
@@ -214,6 +217,9 @@ export async function loadAttribution(storeId: string) {
       visits: count(row.visits),
       orders: count(row.orders),
       sales: count(row.sales),
+      fresh: count(row.fresh),
+      returning: count(row.returning),
+      days: series(row.days),
     }];
   });
 }
@@ -320,16 +326,23 @@ export async function loadQuiz(storeId: string): Promise<QuizRecord> {
     .eq("store_id", storeId)
     .maybeSingle();
   if (error) throw new Error(hebrewError(error));
-  return data ? parseQuiz(data) : unsavedQuiz();
+  return data ? quizFromRow(data) : unsavedQuiz();
 }
 
-export async function saveQuizStatus(storeId: string, status: QuizRecord["status"], stored: boolean) {
+export async function saveQuiz(storeId: string, quiz: QuizRecord) {
+  const problem = quizProblem(quiz.flow);
+  if (problem) throw new Error(problem);
   const supabase = await client();
-  const updatedAt = new Date().toISOString();
-  const query = stored
-    ? supabase.from("store_quizzes").update({ status, updated_at: updatedAt }).eq("store_id", storeId)
-    : supabase.from("store_quizzes").upsert({ store_id: storeId, status, flow: defaultQuizFlow(), updated_at: updatedAt }, { onConflict: "store_id" });
-  const { data, error } = await query.select("status").maybeSingle();
+  const { data, error } = await supabase
+    .from("store_quizzes")
+    .upsert({
+      store_id: storeId,
+      status: quiz.status,
+      flow: quiz.flow,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "store_id" })
+    .select("status")
+    .maybeSingle();
   if (error) throw new Error(hebrewError(error));
   if (!data) throw new Error("לא הצלחנו לשמור את השאלון.");
 }
@@ -383,7 +396,7 @@ export async function loadUsers(storeId: string) {
   });
 }
 
-export async function saveUser(storeId: string, user: UserRow, status: string) {
+export async function saveUser(storeId: string, user: UserRow, status: string, password = "") {
   const supabase = await client();
   const { error } = await supabase.rpc("update_store_user", {
     target_store: storeId,
@@ -392,7 +405,7 @@ export async function saveUser(storeId: string, user: UserRow, status: string) {
     role_title: user.roleName,
     access_areas: user.areas,
     member_status: status,
-    member_password: "",
+    member_password: password,
   });
   if (error) throw new Error(hebrewError(error));
 }
@@ -501,6 +514,24 @@ export async function saveStoreDiscount(storeId: string, discount: Record<string
 export async function deleteStoreDiscounts(storeId: string, ids: string[]) {
   const supabase = await client();
   const { error } = await supabase.rpc("delete_store_discounts", { target_store: storeId, discount_ids: ids });
+  if (error) throw new Error(hebrewError(error));
+}
+
+export async function deleteStoreProducts(storeId: string, ids: string[]) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("delete_store_products", { target_store: storeId, product_ids: ids });
+  if (error) throw new Error(hebrewError(error));
+}
+
+export async function deleteStoreOrder(storeId: string, orderId: string) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("delete_store_order", { target_store: storeId, target_order: orderId });
+  if (error) throw new Error(hebrewError(error));
+}
+
+export async function deleteStoreCustomer(storeId: string, customerId: string) {
+  const supabase = await client();
+  const { error } = await supabase.rpc("delete_store_customer", { target_store: storeId, target_customer: customerId });
   if (error) throw new Error(hebrewError(error));
 }
 

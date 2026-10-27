@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
 import { AreaDetail } from "@/components/area-detail";
 import { CategoryEditor, CategoryPage } from "@/components/category-editor";
-import { PopupEditor, QuizScreen } from "@/components/popups";
+import { PopupEditor } from "@/components/popups";
+import { QuizScreen } from "@/components/quiz-editor";
 import { EventEditor, PostEditor } from "@/components/content-editor";
 import { DetailScreen } from "@/components/detail";
 import { SheetEmpty } from "@/components/shell";
@@ -18,7 +19,7 @@ export default function AreaDetailScreen() {
   const area = areaByKey(key);
   const { access, loading } = useStoreData();
   const segmentName = key === "segments" ? SEGMENTS.find((item) => item.id === id)?.name : undefined;
-  const title = segmentName ?? (key === "reports" ? reportById(id)?.name ?? area?.label ?? "פרטים" : key === "abandoned" ? "עגלה נטושה" : key === "users" && id === "new" ? "הוספת משתמש" : area?.label ?? "פרטים");
+  const title = segmentName ?? (key === "reports" ? reportById(id)?.name ?? area?.label ?? "פרטים" : key === "abandoned" ? "עגלה נטושה" : key === "users" ? (id === "new" ? "הוספת משתמש" : "עריכת משתמש") : key === "policies" ? (id === "new" ? "פוליסה חדשה" : "פוליסה") : key === "shipping" ? "משלוח" : area?.label ?? "פרטים");
   if (!area) return <DetailScreen title="פרטים"><SheetEmpty text="המסך לא נמצא." /></DetailScreen>;
   const allowed = area.settings ? Boolean(access?.settings) : area.permission ? allows(access, area.permission) : true;
   if (area.key === "collections" && id === "new") {

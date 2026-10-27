@@ -11,7 +11,6 @@ export type AreaKey =
   | "integrations"
   | "messages"
   | "automations"
-  | "campaigns"
   | "popups"
   | "posts"
   | "events"
@@ -72,7 +71,6 @@ export const MENU: MenuGroup[] = [
       { key: "integrations", label: "אינטגרציות", permission: "marketing.read" },
       { key: "messages", label: "מיילים ו-SMS", permission: "marketing.read" },
       { key: "automations", label: "אוטומציות", permission: "marketing.read" },
-      { key: "campaigns", label: "קמפיינים", permission: "marketing.read" },
       { key: "popups", label: "פופאפים", permission: "marketing.read" },
     ],
   },
@@ -113,16 +111,6 @@ const AREAS = MENU.flatMap((group) => group.items);
 export function areaByKey(key: string | undefined) {
   return AREAS.find((item) => item.key === key) ?? null;
 }
-
-export const INTEGRATIONS = [
-  { key: "meta", name: "Meta Pixel", detail: "פייסבוק ואינסטגרם" },
-  { key: "gtm", name: "Google Tag Manager", detail: "קונטיינר תגים" },
-  { key: "ga4", name: "Google Analytics 4", detail: "מדידת תנועה" },
-  { key: "gads", name: "Google Ads", detail: "מעקב המרות" },
-  { key: "tiktok", name: "TikTok Pixel", detail: "אירועים וקהלים" },
-  { key: "clarity", name: "Microsoft Clarity", detail: "הקלטות ומפות חום" },
-  { key: "code", name: "קוד מותאם אישית", detail: "סקריפטים לחנות" },
-] as const;
 
 export const SEGMENTS = [
   { id: "vip", name: "לקוחות VIP", minSpent: 1500, minOrders: 5, subOnly: false },

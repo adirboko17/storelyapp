@@ -1,28 +1,29 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, SectionList, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { AnalyticsHome, ReportsLibrary } from "@/components/analytics";
+import { AttributionChannels, GrowthChannels } from "@/components/growth";
 import { PopupsHome } from "@/components/popups";
 import { BrowseList } from "@/components/browse";
 import { Icon } from "@/components/icon";
 import { LiveView } from "@/components/live-view";
 import { NotificationSettings } from "@/components/notification-settings";
+import { AiSettings, GeneralSettings, PoliciesSettings, ShippingSettings, UsersSettings } from "@/components/settings";
 import { OrderRow } from "@/components/rows";
 import { Chips, FlatRow, SearchBar, SectionLabel, SheetEmpty, Thumb } from "@/components/shell";
 import { AppText, Badge, ErrorNote, LoadingBlock, refreshControl } from "@/components/ui";
 import { formatCount, formatIls, hebrewDay, hebrewTime } from "@/lib/format";
-import { INTEGRATIONS, SEGMENTS, type AreaKey } from "@/lib/menu";
+import { SEGMENTS, type AreaKey } from "@/lib/menu";
+import { AutomationsScreen, IntegrationsScreen, MessagesScreen } from "@/components/marketing-screens";
+import { deleteBlogPost, deleteStoreEvent } from "@/lib/content";
 import {
-  loadAttribution,
-  loadCampaigns,
-  loadConnections,
   loadEvents,
   loadReviews,
-  loadUsers,
-  revokeConnection,
   useStoreCall,
   type ReviewRow,
 } from "@/lib/remote";
+import { useSession } from "@/lib/session";
 import { customerCountLabel, inSegment, orderStats, segmentRule } from "@/lib/segments";
 import { useStoreData } from "@/lib/store-data";
 import { sortedOrders, type CheckoutRecord, type OrderRecord } from "@/lib/snapshot";
@@ -60,11 +61,11 @@ export function AreaList({ area }: { area: AreaKey }) {
   if (area === "reviews") return <Reviews />;
   if (area === "gift-cards") return <GiftCards />;
   if (area === "segments") return <Segments />;
-  if (area === "growth" || area === "attribution") return <Channels mode={area} />;
-  if (area === "integrations") return <Integrations />;
-  if (area === "messages") return <Messages />;
-  if (area === "automations") return <Automations />;
-  if (area === "campaigns") return <Campaigns />;
+  if (area === "growth") return <GrowthChannels />;
+  if (area === "attribution") return <AttributionChannels />;
+  if (area === "integrations") return <IntegrationsScreen />;
+  if (area === "messages") return <MessagesScreen />;
+  if (area === "automations") return <AutomationsScreen />;
   if (area === "popups") return <Popups />;
   if (area === "posts") return <Posts />;
   if (area === "events") return <Events />;
@@ -72,12 +73,12 @@ export function AreaList({ area }: { area: AreaKey }) {
   if (area === "analytics") return <AnalyticsHome />;
   if (area === "reports") return <ReportsLibrary />;
   if (area === "store") return <StoreLink />;
-  if (area === "general") return <General />;
+  if (area === "general") return <GeneralSettings />;
   if (area === "notifications") return <NotificationSettings />;
-  if (area === "shipping") return <Shipping />;
-  if (area === "policies") return <Policies />;
-  if (area === "users") return <Users />;
-  return <Connections />;
+  if (area === "shipping") return <ShippingSettings />;
+  if (area === "policies") return <PoliciesSettings />;
+  if (area === "users") return <UsersSettings />;
+  return <AiSettings />;
 }
 
 type ReturnTab = "all" | "partial" | "refunded";
@@ -384,120 +385,6 @@ function Segments() {
   );
 }
 
-function Channels({ mode }: { mode: "growth" | "attribution" }) {
-  const remote = useStoreCall(loadAttribution);
-  const rows = [...(remote.data ?? [])].sort((a, b) => mode === "growth" ? b.sales - a.sales : b.visits - a.visits);
-  const sales = rows.reduce((sum, row) => sum + row.sales, 0);
-  const orders = rows.reduce((sum, row) => sum + row.orders, 0);
-  const visits = rows.reduce((sum, row) => sum + row.visits, 0);
-  return (
-    <BrowseList
-      loading={remote.loading}
-      refreshing={remote.refreshing}
-      onRefresh={() => void remote.refresh()}
-      error={remote.error}
-      data={rows}
-      empty="אין ערוצי ייחוס עדיין"
-      keyExtractor={(row) => `${row.channel}-${row.type}`}
-      header={remote.data ? <Line title={formatIls(sales)} meta={`${formatCount(orders)} הזמנות · ${formatCount(visits)} ביקורים`} /> : undefined}
-      renderItem={(row) => <Line title={row.channel} meta={`${formatCount(row.visits)} ביקורים · ${formatCount(row.orders)} הזמנות · ${formatIls(row.sales)}`} />}
-    />
-  );
-}
-
-function Integrations() {
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const connected = new Set(snapshot?.marketing?.connected ?? []);
-  const present = snapshot?.marketing?.connected;
-  return (
-    <BrowseList
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={present ? [...INTEGRATIONS] : []}
-      empty={present ? "אין אינטגרציות" : "הסנאפשוט לא כולל אינטגרציות."}
-      keyExtractor={(item) => item.key}
-      renderItem={(item) => <Line title={item.name} meta={connected.has(item.key) ? `מחובר · ${item.detail}` : item.detail} />}
-    />
-  );
-}
-
-function Messages() {
-  const router = useRouter();
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const { query, setQuery } = useQueryState();
-  const marketing = snapshot?.marketing;
-  const emails = marketing?.emails;
-  const sms = marketing?.sms;
-  const rows = [
-    ...(emails ?? []).map((item) => ({ id: `email:${item.id}`, title: item.name || item.subject || "מייל", meta: item.subject })),
-    ...(sms ?? []).map((item) => ({ id: `sms:${item.id}`, title: item.name || "SMS", meta: item.text })),
-  ].filter((item) => match(query, `${item.title} ${item.meta ?? ""}`));
-  const missing = !marketing || (emails == null && sms == null);
-  return (
-    <BrowseList
-      query={query}
-      onQuery={setQuery}
-      placeholder="חיפוש הודעות"
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={missing ? [] : rows}
-      empty={missing ? "הסנאפשוט לא כולל מיילים ו-SMS." : "אין הודעות עדיין"}
-      keyExtractor={(item) => item.id}
-      onPress={(item) => router.push(href("messages", item.id))}
-      renderItem={(item) => <Line title={item.title} meta={item.meta} />}
-    />
-  );
-}
-
-function Automations() {
-  const router = useRouter();
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const rows = snapshot?.marketing?.flows;
-  return (
-    <BrowseList
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={rows ?? []}
-      empty={rows ? "אין אוטומציות עדיין" : "הסנאפשוט לא כולל אוטומציות."}
-      keyExtractor={(item) => item.id}
-      onPress={(item) => router.push(href("automations", item.id))}
-      renderItem={(item) => <Line title={item.name} meta={[item.trigger, item.on === false ? "כבויה" : item.on ? "פעילה" : ""].filter(Boolean).join(" · ")} />}
-    />
-  );
-}
-
-function Campaigns() {
-  const router = useRouter();
-  const remote = useStoreCall(loadCampaigns);
-  return (
-    <BrowseList
-      loading={remote.loading}
-      refreshing={remote.refreshing}
-      onRefresh={() => void remote.refresh()}
-      error={remote.error}
-      data={remote.data ?? []}
-      empty="אין קמפיינים עדיין"
-      keyExtractor={(item) => item.id}
-      onPress={(item) => router.push(href("campaigns", item.id))}
-      renderItem={(item) => <Line title={item.name} meta={[campaignStatus(item.status), item.audience].filter(Boolean).join(" · ")} />}
-    />
-  );
-}
-
-function campaignStatus(status: string) {
-  if (status === "scheduled") return "מתוזמן";
-  if (status === "cancelled") return "בוטל";
-  if (status === "sending" || status === "sent") return "שליחה חסומה";
-  if (status === "draft") return "טיוטה";
-  return status;
-}
-
 function Popups() {
   return <PopupsHome />;
 }
@@ -505,15 +392,37 @@ function Popups() {
 function Posts() {
   const fonts = useFontSet();
   const router = useRouter();
+  const { storeId } = useSession();
   const { snapshot, loading, refreshing, error, refresh } = useStoreData();
   const { query, setQuery } = useQueryState();
   const [tab, setTab] = useState<"all" | "visible" | "hidden">("all");
+  const [problem, setProblem] = useState("");
   const rows = snapshot?.posts;
   const visible = (rows ?? []).filter((post) => {
     if (tab === "visible" && post.visible === false) return false;
     if (tab === "hidden" && post.visible !== false) return false;
     return match(query, `${post.title ?? ""} ${post.excerpt ?? ""} ${post.author ?? ""} ${post.blog ?? ""}`);
   });
+  function askDelete(id: string, title: string) {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    Alert.alert("למחוק את הפוסט?", `${title || "פוסט"}\nאי אפשר לשחזר אותו.`, [
+      { text: "ביטול", style: "cancel" },
+      { text: "מחיקה", style: "destructive", onPress: () => void remove(id) },
+    ]);
+  }
+  async function remove(id: string) {
+    if (!storeId) {
+      setProblem("אין חנות נבחרת.");
+      return;
+    }
+    setProblem("");
+    try {
+      await deleteBlogPost(storeId, id);
+      await refresh();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "לא הצלחנו למחוק את הפוסט.");
+    }
+  }
   return (
     <BrowseList
       query={query}
@@ -522,11 +431,12 @@ function Posts() {
       loading={loading}
       refreshing={refreshing}
       onRefresh={() => void refresh()}
-      error={error}
+      error={problem || error}
       data={rows ? visible : []}
       empty={!rows ? "הסנאפשוט לא כולל פוסטים." : tab === "all" ? "אין פוסטים עדיין. לחצו על + כדי לכתוב פוסט." : "אין פוסטים בסינון הזה"}
       keyExtractor={(post) => post.id}
       onPress={(post) => router.push(href("posts", post.id))}
+      onLongPress={(post) => askDelete(post.id, post.title ?? "")}
       header={<Chips items={[{ id: "all", label: "הכל" }, { id: "visible", label: "גלוי" }, { id: "hidden", label: "מוסתר" }]} value={tab} onChange={setTab} />}
       renderItem={(post) => {
         const shown = post.visible !== false;
@@ -549,7 +459,9 @@ function Posts() {
 function Events() {
   const fonts = useFontSet();
   const router = useRouter();
+  const { storeId } = useSession();
   const remote = useStoreCall(loadEvents);
+  const [problem, setProblem] = useState("");
   const refreshEvents = remote.refresh;
   const { query, setQuery } = useQueryState();
   const [tab, setTab] = useState<"all" | "draft" | "open" | "ended">("all");
@@ -567,6 +479,26 @@ function Events() {
     if (tab === "ended" && item.status !== "ended" && item.status !== "cancelled") return false;
     return match(query, `${item.title} ${item.short} ${item.date}`);
   });
+  function askDelete(id: string, title: string) {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    Alert.alert("למחוק את האירוע?", `${title || "אירוע"}\nגם ההרשמות יימחקו, ואי אפשר לשחזר אותו.`, [
+      { text: "ביטול", style: "cancel" },
+      { text: "מחיקה", style: "destructive", onPress: () => void remove(id) },
+    ]);
+  }
+  async function remove(id: string) {
+    if (!storeId) {
+      setProblem("אין חנות נבחרת.");
+      return;
+    }
+    setProblem("");
+    try {
+      await deleteStoreEvent(storeId, id);
+      await remote.refresh();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "לא הצלחנו למחוק את האירוע.");
+    }
+  }
   return (
     <BrowseList
       query={query}
@@ -575,11 +507,12 @@ function Events() {
       loading={remote.loading}
       refreshing={remote.refreshing}
       onRefresh={() => void remote.refresh()}
-      error={remote.error}
+      error={problem || remote.error}
       data={remote.data ? rows : []}
       empty={tab === "all" ? "אין אירועים עדיין. לחצו על + כדי להוסיף אירוע." : "אין אירועים בסינון הזה"}
       keyExtractor={(item) => item.id}
       onPress={(item) => router.push(href("events", item.id))}
+      onLongPress={(item) => askDelete(item.id, item.title)}
       header={<Chips items={[{ id: "all", label: "הכל" }, { id: "open", label: "פתוח" }, { id: "draft", label: "טיוטה" }, { id: "ended", label: "הסתיים" }]} value={tab} onChange={setTab} />}
       renderItem={(item) => {
         const badge = eventBadge(item.status);
@@ -624,133 +557,3 @@ function StoreLink() {
   );
 }
 
-function General() {
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const contact = snapshot?.shipping?.contact;
-  const rows = [
-    snapshot?.name ? { id: "name", title: "שם החנות", meta: snapshot.name } : null,
-    snapshot?.hostname ? { id: "host", title: "כתובת", meta: snapshot.hostname } : null,
-    snapshot?.currency ? { id: "currency", title: "מטבע", meta: snapshot.currency } : null,
-    contact?.email ? { id: "email", title: "אימייל", meta: contact.email } : null,
-    contact?.phone ? { id: "phone", title: "טלפון", meta: contact.phone } : null,
-    contact?.city ? { id: "city", title: "עיר", meta: [contact.street, contact.city].filter(Boolean).join(", ") } : null,
-  ].filter((item): item is { id: string; title: string; meta: string } => Boolean(item));
-  return (
-    <BrowseList
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={rows}
-      empty="אין פרטים כלליים בסנאפשוט."
-      keyExtractor={(item) => item.id}
-      renderItem={(item) => <Line title={item.title} meta={item.meta} />}
-    />
-  );
-}
-
-function Shipping() {
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const shipping = snapshot?.shipping;
-  const rows = [
-    ...(shipping?.profiles ?? []).map((profile) => ({ id: profile.id, title: profile.name || "פרופיל משלוח", meta: "פרופיל" })),
-    ...(shipping?.rules ?? []).map((rule) => ({ id: rule.id, title: rule.name || "כלל החזרה", meta: [rule.days, rule.fee].filter(Boolean).join(" · ") })),
-    shipping?.localDelivery != null ? { id: "local", title: "משלוח מקומי", meta: shipping.localDelivery ? "פעיל" : "כבוי" } : null,
-    shipping?.pickup != null ? { id: "pickup", title: "איסוף עצמי", meta: shipping.pickup ? "פעיל" : "כבוי" } : null,
-    shipping?.estimates != null ? { id: "estimates", title: "הערכת זמני משלוח", meta: shipping.estimates ? "פעילה" : "כבויה" } : null,
-  ].filter((item): item is { id: string; title: string; meta: string } => Boolean(item));
-  return (
-    <BrowseList
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={shipping ? rows : []}
-      empty={shipping ? "אין הגדרות משלוח עדיין" : "הסנאפשוט לא כולל משלוחים."}
-      keyExtractor={(item) => item.id}
-      renderItem={(item) => <Line title={item.title} meta={item.meta} />}
-    />
-  );
-}
-
-function Policies() {
-  const router = useRouter();
-  const { snapshot, loading, refreshing, error, refresh } = useStoreData();
-  const rows = snapshot?.policies;
-  return (
-    <BrowseList
-      loading={loading}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}
-      error={error}
-      data={rows ?? []}
-      empty={rows ? "אין פוליסות עדיין" : "הסנאפשוט לא כולל פוליסות."}
-      keyExtractor={(item) => item.id}
-      onPress={(item) => router.push(href("policies", item.id))}
-      renderItem={(item) => <Line title={item.title} />}
-    />
-  );
-}
-
-function Users() {
-  const fonts = useFontSet();
-  const router = useRouter();
-  const remote = useStoreCall(loadUsers);
-  return (
-    <BrowseList
-      loading={remote.loading}
-      refreshing={remote.refreshing}
-      onRefresh={() => void remote.refresh()}
-      error={remote.error}
-      data={remote.data ?? []}
-      empty="אין משתמשים"
-      keyExtractor={(user) => user.userId}
-      onPress={(user) => router.push(href("users", user.userId))}
-      header={(
-        <Pressable onPress={() => router.push(href("users", "new"))} style={{ marginHorizontal: 12, marginBottom: 8, height: 44, borderRadius: 8, backgroundColor: tokens.inkStrong, alignItems: "center", justifyContent: "center" }}>
-          <AppText style={{ color: "#fff", fontFamily: fonts.semibold }}>הוספת משתמש</AppText>
-        </Pressable>
-      )}
-      renderItem={(user) => <Line title={user.name} meta={[user.roleName, user.status === "active" ? "פעיל" : user.status].filter(Boolean).join(" · ")} />}
-    />
-  );
-}
-
-function Connections() {
-  const remote = useStoreCall(loadConnections);
-  const [busy, setBusy] = useState("");
-  const [problem, setProblem] = useState("");
-  const rows = useMemo(() => remote.data ?? [], [remote.data]);
-  return (
-    <BrowseList
-      loading={remote.loading}
-      refreshing={remote.refreshing}
-      onRefresh={() => void remote.refresh()}
-      error={remote.error || problem}
-      data={rows}
-      empty="אין חיבורי AI עדיין"
-      keyExtractor={(item) => item.id}
-      onPress={(item) => {
-        if (!remote.storeId || busy) return;
-        Alert.alert("ביטול חיבור", item.name, [
-          { text: "השארה", style: "cancel" },
-          {
-            text: "ביטול החיבור",
-            style: "destructive",
-            onPress: () => {
-              const storeId = remote.storeId;
-              if (!storeId) return;
-              setBusy(item.id);
-              setProblem("");
-              void revokeConnection(storeId, item.id)
-                .then(() => remote.refresh())
-                .catch((caught: unknown) => setProblem(caught instanceof Error ? caught.message : "לא הצלחנו לבטל את החיבור."))
-                .finally(() => setBusy(""));
-            },
-          },
-        ]);
-      }}
-      renderItem={(item) => <Line title={item.name} meta={busy === item.id ? "מבטל…" : "ביטול חיבור"} />}
-    />
-  );
-}
